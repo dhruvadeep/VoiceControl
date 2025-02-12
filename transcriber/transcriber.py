@@ -1,8 +1,24 @@
 import whisper
+import uvicorn
 from torch import cuda
 from API_calls import *
+from fastapi import FastAPI, UploadFile, File
+from fastapi.middleware.cors import CORSMiddleware
+import numpy as np
+from io import BytesIO
+from pydub.audio_segment import AudioSegment
 
-DEVICE = "cuda" if cuda.is_available() else "cpu"
+APP = FastAPI()
+APP.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Change to specific domains in production
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# DEVICE = "cuda" if cuda.is_available() else "cpu"
+DEVICE = "cpu"
 try:
     MODEL = whisper.load_model("medium.en", DEVICE)
 except:
@@ -55,16 +71,25 @@ def commands(transcription: str):
     if not command_executed:
         speak("no command executed")
 
-def transcribe(recording):
-    print("shape of the recording", recording.shape)
+@APP.post("/transcribe")
+async def transcribe(recording: UploadFile = File(...)):
+    audio = await recording.read()
+    audio_buffer = BytesIO(audio)
+    audio_segment = AudioSegment.from_file(audio_buffer).set_frame_rate(16000).set_channels(1).set_sample_width(2)
+    samples = np.array(audio_segment.get_array_of_samples(), dtype=np.float32)/32768
     result = MODEL.transcribe(
-        recording,
+        samples,
         temperature=0,
         condition_on_previous_text=False,
         word_timestamps=True,
         # hallucination_silence_threshold=0.7,
         # no_speech_threshold=0.8
     )
-    print("text:", result["text"])
     transcription = result["text"].lower()
     commands(transcription)
+    return {"response": transcription}
+
+
+if __name__ == "__main__":
+    uvicorn.run("__main__:APP", host="localhost", port=8000, reload=True)
+    # print(whisper.audio.FRAMES_PER_SECOND, whisper.audio.SAMPLE_RATE)
