@@ -7,6 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 import numpy as np
 from io import BytesIO
 from pydub.audio_segment import AudioSegment
+from pydantic import validate_call
 
 APP = FastAPI()
 APP.add_middleware(
@@ -17,15 +18,18 @@ APP.add_middleware(
     allow_headers=["*"],
 )
 
-# DEVICE = "cuda" if cuda.is_available() else "cpu"
 DEVICE = "cpu"
 try:
     MODEL = whisper.load_model("medium.en", DEVICE)
 except:
     MODEL = whisper.load_audio("medium.en", "cpu")
+
+#incomplete: need to add more commands
 COMMANDS = [
-    (["search for", "search", "bing"], open_browser_and_search),
-    (["open browser"], open_browser),
+    (["search for", "search", "bing"], search),
+    (["open browser", "open page", "open new page"], open_browser),
+    (["close browser", "shutdown browser"], close_browser),
+    (["close current window", "close window"], close_current_window),
     (["open camera"], open_camera),
     (["take screenshot", "take a screenshot"], screenshot),
     (["show ram info", "get ram info", "show ram usage", "get ram usage"], get_ram),
@@ -35,41 +39,22 @@ COMMANDS = [
     (["show system info", "get system info", "show hardware info", "get hardware info"], get_all)
 ]
 
-def commands(transcription: str):
-    command_executed = False
-    try:
-        for cmds, fn in COMMANDS:
-            for cmd in cmds:
-                if cmd in transcription:
-                    if cmd == "search for":
-                        query = " ".join(transcription.split("search for")[1:])
-                        if query != "":
-                            fn(query)
-                            command_executed = True
-                        break
-                    elif cmd == "search":
-                        query = " ".join(transcription.split("search")[1:])
-                        if query != "":
-                            fn(query)
-                            command_executed = True
-                        break
-                    elif cmd == "bing":
-                        query = " ".join(transcription.split("bing")[1:])
-                        if query != "":
-                            fn(query)
-                            command_executed = True
-                        break
-                    else:
-                        fn()
-                        command_executed = True
-                        break
-            if command_executed:
-                break
-    except:
-        print("some unexpected error occured")
-        speak("some unexpected error occured")
-    if not command_executed:
-        speak("no command executed")
+@validate_call
+def commands(transcription: str) -> dict|None:
+    transcription = transcription.lower()
+    user_instructions = []
+    for i in transcription.split("and"):
+        for j in i.split("."):
+            for k in j.split(","):
+                user_instructions.append(k)
+    responses = []
+    for user_instruction in user_instructions:
+        for commands, fn in COMMANDS:
+            for command in commands:
+                if command in user_instruction:
+                    response = fn(command, user_instruction)
+                    responses.append(response)
+    return {"response":responses}
 
 @APP.post("/transcribe")
 async def transcribe(recording: UploadFile = File(...)):
@@ -86,10 +71,9 @@ async def transcribe(recording: UploadFile = File(...)):
         # no_speech_threshold=0.8
     )
     transcription = result["text"].lower()
-    commands(transcription)
-    return {"response": transcription}
+    response = commands(transcription)
+    return {"response": response, "message": transcription}
 
 
 if __name__ == "__main__":
     uvicorn.run("__main__:APP", host="localhost", port=8000, reload=True)
-    # print(whisper.audio.FRAMES_PER_SECOND, whisper.audio.SAMPLE_RATE)
