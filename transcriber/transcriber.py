@@ -54,6 +54,7 @@ def commands(transcription: str) -> dict|None:
                 if command in user_instruction:
                     response = fn(command, user_instruction)
                     responses.append(response)
+                    break
     return {"response":responses}
 
 @APP.post("/transcribe")

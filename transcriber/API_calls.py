@@ -1,6 +1,17 @@
 import requests
 from pydantic import validate_call
 
+
+"""
+command is the defined command in the COMMAND list.
+
+user_instruction is the instruction passed by the user.
+
+suppose user instruction is 'search for elden ring' and command is 'search for'
+then split while sending requests, send only 'elden ring' part
+"""
+
+
 @validate_call
 def search(command:str, user_instruction:str):
     pass
