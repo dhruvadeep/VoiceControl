@@ -1,6 +1,6 @@
 // set up basic variables for app
 
-const TRANSCRIBER_URL = "http://localhost:8000/transcribe"
+const TRANSCRIBER_URL = "http://10.32.3.152:8000/transcribe"
 
 const record = document.querySelector('.record');
 const stop = document.querySelector('.stop');
