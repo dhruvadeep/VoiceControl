@@ -1,61 +1,120 @@
-from playwright.sync_api import sync_playwright
-from time import sleep
-from models import SearchQuery
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-import uvicorn
+from playwright.async_api import Browser, BrowserContext, Page, async_playwright
+from pydantic import BaseModel
+
+
+class SearchQuery(BaseModel):
+    query: str
+
 
 APP = FastAPI()
+
 APP.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Change to specific domains in production
+    allow_origins=[
+        "*"
+    ],  # For production, specify your allowed domain(s) instead of "*"
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
+PLAYWRIGHT = None
+BROWSER: Browser = None
+CONTEXT: BrowserContext = None
 
-playwright = sync_playwright().start()
-browser = playwright.firefox.launch(headless=False)
-context = browser.new_context()
 SEARCH_URL = "https://www.bing.com/search?q="
 
+
+@APP.on_event("startup")
+async def startup():
+    """
+    On application startup:
+      1. Launch async Playwright.
+      2. Launch a Firefox browser (change to chromium or webkit if desired).
+      3. Create a new browser context.
+    """
+    global PLAYWRIGHT, BROWSER, CONTEXT
+    PLAYWRIGHT = await async_playwright().start()
+    # NOTE: set `headless=False` to see the browser window, or True to run in the background
+    BROWSER = await PLAYWRIGHT.firefox.launch(headless=False)
+    CONTEXT = await BROWSER.new_context()
+
+
+@APP.on_event("shutdown")
+async def shutdown():
+    """
+    On application shutdown, close Playwright properly.
+    """
+    global PLAYWRIGHT
+    if PLAYWRIGHT:
+        await PLAYWRIGHT.stop()
+
+
 @APP.post("/browser/new_window_and_search")
-def new_window_and_search(query: SearchQuery):
-    open_new_window()
-    return search(query)
+async def new_window_and_search(query: SearchQuery):
+    await open_new_window()
+    return await search(query)
+
 
 @APP.post("/browser/open_new_window")
-def open_new_window():
+async def open_new_window():
+    """
+    Opens a new page (window) in the existing browser context,
+    limited to 5 pages by default.
+    """
+    global CONTEXT
     try:
-        if len(context.pages) >= 5:
-            raise Exception("cannot open more windows")
-        context.new_page()
+        if len(CONTEXT.pages) >= 5:
+            raise Exception("Cannot open more windows (limit reached).")
+        await CONTEXT.new_page()
+        return {"response": "Opened a new window."}
     except Exception as e:
-        print(e)
         return {"response": str(e)}
 
+
 @APP.post("/browser/search")
-def search(query: SearchQuery):
-    if len(context.pages) == 0:
-        return new_window_and_search()
-    else:
-        context.pages[-1].goto(SEARCH_URL+query.query)
-        return {"response": f"searching for {query.query}"}
-    
+async def search(query: SearchQuery):
+    """
+    Performs a search on the most recently opened page.
+    If no pages are open, it will create a new one and perform the search.
+    """
+    global CONTEXT
+    if len(CONTEXT.pages) == 0:
+        # If no pages exist, open a new window automatically
+        await open_new_window()
+
+    # Get the last page in the context
+    page: Page = CONTEXT.pages[-1]
+    await page.goto(SEARCH_URL + query.query)
+    return {"response": f"Searching for {query.query}"}
+
+
 @APP.post("/browser/close_current_window")
-def close_current_window():
-    if len(context.pages) == 0:
-        return 
-    context.pages[-1].close()
-    return {"response": "closed current window"}
+async def close_current_window():
+    """
+    Closes the most recently opened window if any exist.
+    """
+    global CONTEXT
+    if len(CONTEXT.pages) == 0:
+        return {"response": "No open windows to close."}
+
+    await CONTEXT.pages[-1].close()
+    return {"response": "Closed the current window."}
+
 
 @APP.post("/browser/close_browser")
-def close_browser():
-    for page in context.pages:
-        page.close()
-    return {"response": "closed the browser"}
+async def close_browser():
+    """
+    Closes all open pages in the current context.
+    (Does NOT close the entire Playwright instance,
+    but you can shut down the entire app to do that.)
+    """
+    global CONTEXT
+    for page in CONTEXT.pages:
+        await page.close()
+    return {"response": "Closed all browser windows."}
 
 
-if __name__ == "__main__":
-    uvicorn.run("__main__:APP", host="localhost", port=8001, reload=True)
+# Run with: uvicorn this_file_name:APP --host 0.0.0.0 --port 8000 --reload

@@ -1,17 +1,27 @@
 import asyncio
+import shutil
 import uuid
 from threading import Lock
 
 import cv2
+import psutil
 import pyautogui
 from fastapi import FastAPI, HTTPException, Response
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 
 app = FastAPI()
 
 # Global camera object and a lock to prevent concurrent access.
 camera = None
 camera_lock = Lock()
+
+
+# add middleware to allow CORS
+@app.middleware("http")
+async def add_cors_header(request, call_next):
+    response = await call_next(request)
+    response.headers["Access-Control-Allow-Origin"] = "*"
+    return response
 
 
 @app.on_event("startup")
@@ -80,3 +90,54 @@ def screenshot():
     return FileResponse(
         path=filename, media_type="image/png", filename="screenshot.png"
     )
+
+
+@app.get("/cpu")
+def cpu():
+    cpu_percent = psutil.cpu_percent(interval=0.5)
+    return JSONResponse(content={"cpu_percent": cpu_percent})
+
+
+def get_disk_usage():
+    total, used, free = shutil.disk_usage("/")
+    return total, used, free
+
+
+def format_size(byte_size):
+    for unit in ["B", "KB", "MB", "GB", "TB"]:
+        if byte_size < 1024:
+            return f"{byte_size:.2f}{unit}"
+        byte_size /= 1024
+    return byte_size
+
+
+@app.get("/disk")
+def disk():
+    total, used, free = get_disk_usage()
+    return JSONResponse(
+        content={
+            "total": format_size(total),
+            "used": format_size(used),
+            "free": format_size(free),
+        }
+    )
+
+
+@app.get("/ram")
+def ram():
+    total = psutil.virtual_memory().total
+    available = psutil.virtual_memory().available
+    used = total - available
+    return JSONResponse(
+        content={
+            "total": format_size(total),
+            "used": format_size(used),
+            "available": format_size(available),
+        }
+    )
+
+
+if __name__ == "__main__":
+    import uvicorn
+
+    uvicorn.run(app, host="0.0.0.0", port=8003)

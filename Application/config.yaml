@@ -1,0 +1,12 @@
+hardware_service:
+  host: "localhost"
+  port: 8003
+
+browser_service:
+  host: "localhost"
+  port: 8001
+
+aggregator_service:
+  host: "0.0.0.0"
+  port: 8000
+  reload: true

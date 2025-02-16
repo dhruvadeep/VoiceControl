@@ -1,13 +1,13 @@
-import whisper
-import uvicorn
-from torch import cuda
-from API_calls import *
-from fastapi import FastAPI, UploadFile, File
-from fastapi.middleware.cors import CORSMiddleware
-import numpy as np
 from io import BytesIO
-from pydub.audio_segment import AudioSegment
+
+import numpy as np
+import uvicorn
+import whisper
+from API_calls import *
+from fastapi import FastAPI, File, UploadFile
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import validate_call
+from pydub.audio_segment import AudioSegment
 
 APP = FastAPI()
 APP.add_middleware(
@@ -20,27 +20,50 @@ APP.add_middleware(
 
 DEVICE = "cpu"
 try:
-    MODEL = whisper.load_model("medium.en", DEVICE)
+    MODEL = whisper.load_model("base.en", DEVICE)
 except:
-    MODEL = whisper.load_audio("medium.en", "cpu")
+    MODEL = whisper.load_audio("base.en", "cpu")
 
-#incomplete: need to add more commands
+# incomplete: need to add more commands
 COMMANDS = [
     (["search for", "search", "bing"], "search"),
-    (["open browser", "open page", "open new page"], "open_browser"),
+    (["open browser", "open page", "open new page"], "open_new_window   "),
     (["close browser", "shutdown browser"], "close_browser"),
     (["close current window", "close window"], "close_current_window"),
-    (["open camera"], "open_camera"),
+    (["open camera"], "capture"),
     (["take screenshot", "take a screenshot"], "screenshot"),
-    (["show ram info", "get ram info", "show ram usage", "get ram usage"], "get_ram"),
-    (["show disk info", "get disk info", "show disk usage", "get disk usage"], "get_disk"),
+    (
+        [
+            "show ram info",
+            "get ram info",
+            "show ram usage",
+            "get ram usage",
+            "ram",
+            "take ram",
+        ],
+        "ram",
+    ),
+    (
+        ["show disk info", "get disk info", "show disk usage", "get disk usage"],
+        "get_disk",
+    ),
     (["show cpu usage", "get cpu usage"], "get_cpu_usage"),
     (["show cpu info", "get cpu info"], "get_cpu_info"),
-    (["show system info", "get system info", "show hardware info", "get hardware info"], "get_all")
+    (
+        [
+            "show system info",
+            "get system info",
+            "show hardware info",
+            "get hardware info",
+        ],
+        "get_all",
+    ),
+    (["show life", "show life help"], "get_all"),
 ]
 
+
 @validate_call
-def commands(transcription: str) -> dict[str:list[dict[str:str]]]|None:
+def commands(transcription: str) -> dict[str : list[dict[str:str]]] | None:
     transcription = transcription.lower()
     user_instructions = []
     for i in transcription.split("and"):
@@ -55,18 +78,24 @@ def commands(transcription: str) -> dict[str:list[dict[str:str]]]|None:
                     additional_information = user_instruction.split(query)[1]
                     response = {
                         "command": command,
-                        "additional": additional_information
+                        "additional": additional_information,
                     }
                     responses.append(response)
                     break
-    return {"response":responses}
+    return {"response": responses}
+
 
 @APP.post("/transcribe")
 async def transcribe(recording: UploadFile = File(...)):
     audio = await recording.read()
     audio_buffer = BytesIO(audio)
-    audio_segment = AudioSegment.from_file(audio_buffer).set_frame_rate(16000).set_channels(1).set_sample_width(2)
-    samples = np.array(audio_segment.get_array_of_samples(), dtype=np.float32)/32768
+    audio_segment = (
+        AudioSegment.from_file(audio_buffer)
+        .set_frame_rate(16000)
+        .set_channels(1)
+        .set_sample_width(2)
+    )
+    samples = np.array(audio_segment.get_array_of_samples(), dtype=np.float32) / 32768
     result = MODEL.transcribe(
         samples,
         temperature=0,
@@ -81,4 +110,4 @@ async def transcribe(recording: UploadFile = File(...)):
 
 
 if __name__ == "__main__":
-    uvicorn.run("__main__:APP", host="0.0.0.0", port=8000, reload=True)
+    uvicorn.run("__main__:APP", host="0.0.0.0", port=8005, reload=True)
