@@ -9,11 +9,11 @@
       margin: 0;
       font-family: Arial, sans-serif;
       background: #f0f0f0;
+      text-align: center;
     }
     .container {
       max-width: 700px;
       margin: 0 auto;
-      text-align: center;
       padding: 30px 20px;
     }
     h1 {
@@ -27,7 +27,6 @@
       height: 100px;
       background: #007BFF;
       border-radius: 50%;
-      margin: 0 auto;
       display: flex;
       align-items: center;
       justify-content: center;
@@ -55,7 +54,7 @@
       50% { transform: scale(1.1); }
       100% { transform: scale(1); }
     }
-    /* Conversation container styling */
+    /* Conversation container */
     .conversation {
       display: flex;
       justify-content: space-between;
@@ -86,10 +85,6 @@
     .bubble.system {
       background: #f8d7da;
     }
-    .bubble strong {
-      display: block;
-      margin-bottom: 5px;
-    }
     /* Clear button styling */
     #clear-button {
       margin-top: 30px;
@@ -105,20 +100,29 @@
     #clear-button:hover {
       background: #c82333;
     }
+    /* Image display */
+    #image-container {
+      margin-top: 20px;
+      text-align: center;
+    }
+    #image-container img {
+      max-width: 90%;
+      border-radius: 8px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.2);
+    }
   </style>
 </head>
 <body>
   <div class="container">
     <h1>Voice Control</h1>
     <div id="mic-button">
-      <!-- Microphone SVG Icon -->
       <svg id="mic-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 384 512">
         <path d="M192 352c53.02 0 96-42.98 96-96V96c0-53.02-42.98-96-96-96s-96 42.98-96 96v160c0 53.02 42.98 96 96 96zM368 192c0 97.05-78.95 176-176 176S16 289.05 16 192H0c0 106 86 192 192 192s192-86 192-192h-16z"/>
       </svg>
     </div>
     <div class="recording-status" id="status">Tap the mic to start recording</div>
 
-    <!-- Conversation view with two columns -->
+    <!-- Conversation -->
     <div class="conversation">
       <div class="column" id="user-column">
         <h3>User</h3>
@@ -127,6 +131,9 @@
         <h3>System</h3>
       </div>
     </div>
+
+    <!-- Image display -->
+    <div id="image-container"></div>
 
     <!-- Clear button -->
     <button id="clear-button">Clear Conversation</button>
@@ -140,24 +147,18 @@
     const statusText = document.getElementById("status");
     const userColumn = document.getElementById("user-column");
     const systemColumn = document.getElementById("system-column");
+    const imageContainer = document.getElementById("image-container");
     const clearButton = document.getElementById("clear-button");
 
-    // Speech synthesis function
     function speakText(text) {
       if ('speechSynthesis' in window) {
         const utterance = new SpeechSynthesisUtterance(text);
         utterance.pitch = 2.0;
         utterance.rate = 0.9;
-        let voices = window.speechSynthesis.getVoices();
-        const engIndianVoice = voices.find(voice => voice.lang.toLowerCase().includes("en-in"));
-        if (engIndianVoice) {
-          utterance.voice = engIndianVoice;
-        }
         window.speechSynthesis.speak(utterance);
       }
     }
 
-    // Append a bubble to a given column
     function appendBubble(column, type, label, text) {
       const bubble = document.createElement("div");
       bubble.classList.add("bubble", type);
@@ -166,7 +167,6 @@
       column.scrollTop = column.scrollHeight;
     }
 
-    // Start recording audio
     async function startRecording() {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -190,7 +190,6 @@
       }
     }
 
-    // Stop recording
     function stopRecording() {
       if (mediaRecorder && isRecording) {
         mediaRecorder.stop();
@@ -200,90 +199,53 @@
       }
     }
 
-    // Send audio and execute commands
     async function sendAudio(audioBlob) {
-    const formData = new FormData();
-    formData.append("recording", audioBlob, "recording.webm");
+      const formData = new FormData();
+      formData.append("recording", audioBlob, "recording.webm");
 
-    try {
-      const response = await fetch("http://10.32.3.152:8005/transcribe", {
-        method: "POST",
-        body: formData,
-      });
-      const data = await response.json();
+      try {
+        const response = await fetch("http://10.32.3.152:8005/transcribe", {
+          method: "POST",
+          body: formData,
+        });
+        const data = await response.json();
 
-      const transcript = data.message.trim();
-      let systemResponse = "None";
+        const transcript = data.message.trim();
+        let systemResponse = "None";
 
-      if (data.response?.response?.length > 0) {
-        const responses = [];
-
-        for (const cmdObj of data.response.response) {
-          const command = cmdObj.command;
-          let resText = "Error";
-          let isImageResponse = false;
-          let imageUrl = "";
-
-          try {
-            const requestBody =
-              command === "search" || command === "new_window_and_search"
-                ? JSON.stringify({ query: cmdObj.additional })
-                : null;
-
-            const res = await fetch(`http://10.32.3.152:8000/${command}`, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: requestBody,
-            });
-
+        if (data.response?.response?.length > 0) {
+          for (const cmdObj of data.response.response) {
+            const command = cmdObj.command;
+            let resText = "Error";
+            
+            const res = await fetch(`http://10.32.3.152:8000/${command}`, { method: "POST" });
             if (command === "screenshot" || command === "capture") {
               const imageBlob = await res.blob();
-              imageUrl = URL.createObjectURL(imageBlob);
-              isImageResponse = true;
+              const imageUrl = URL.createObjectURL(imageBlob);
+              imageContainer.innerHTML = `<img src="${imageUrl}" alt="Captured Image"/>`;
+              continue;
             } else {
               resText = await res.text();
             }
-          } catch (error) {
-            console.error(`Error executing ${command}:`, error);
-          }
 
-          if (isImageResponse) {
-            responses.push(`${command}: <img src="${imageUrl}" alt="Screenshot" style="max-width:100%; border-radius:8px;"/>`);
-          } else {
-            responses.push(`${resText}`);
+            systemResponse = resText;
           }
         }
 
-        systemResponse = responses.join("<br>");
-      }
+        appendBubble(userColumn, "user", "Voice", transcript);
+        appendBubble(systemColumn, "system", "Voice", systemResponse);
+        if (!systemResponse.includes("<img")) speakText(systemResponse);
 
-      appendBubble(userColumn, "user", "Voice", transcript);
-      appendBubble(systemColumn, "system", "Voice", systemResponse);
-
-      // speak out the system response 
-      
-      speakText(systemResponse);
-
-      if (systemResponse.includes("screenshot")) {
-        const imageElement = document.createElement("img");
-        imageElement.src = imageUrl;
-        imageElement.style.maxWidth = "100%";
-        imageElement.style.borderRadius = "8px";
-        appendBubble(systemColumn, "system", "Voice", imageElement.outerHTML);
+      } catch (error) {
+        console.error("Error processing audio:", error);
       }
-      if (systemResponse == "None") {
-        speakText("Sorry, I didn't get that. Can you please repeat?");
-      }
-    } catch (error) {
-      console.error("Error processing audio:", error);
     }
-  }
-
 
     micButton.addEventListener("click", () => isRecording ? stopRecording() : startRecording());
     clearButton.addEventListener("click", () => {
       userColumn.innerHTML = "<h3>User</h3>";
       systemColumn.innerHTML = "<h3>System</h3>";
+      imageContainer.innerHTML = "";
     });
   </script>
 </body>
