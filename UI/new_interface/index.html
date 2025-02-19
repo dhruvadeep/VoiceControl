@@ -105,6 +105,31 @@
     #clear-button:hover {
       background: #c82333;
     }
+    /* Modal styling */
+    .modal {
+      display: none;
+      position: fixed;
+      z-index: 1000;
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(0, 0, 0, 0.7);
+      justify-content: center;
+      align-items: center;
+    }
+    .modal-content {
+      max-width: 90%;
+      max-height: 90%;
+    }
+    .close {
+      position: absolute;
+      top: 15px;
+      right: 25px;
+      color: white;
+      font-size: 35px;
+      cursor: pointer;
+    }
   </style>
 </head>
 <body>
@@ -131,7 +156,11 @@
     <!-- Clear button -->
     <button id="clear-button">Clear Conversation</button>
   </div>
-
+<!-- Modal for Image Popup -->
+<div id="imageModal" class="modal">
+  <span class="close" onclick="closeModal()">&times;</span>
+  <img class="modal-content" id="modalImage">
+</div>
   <script>
     let mediaRecorder;
     let audioChunks = [];
@@ -156,15 +185,37 @@
         window.speechSynthesis.speak(utterance);
       }
     }
-
-    // Append a bubble to a given column
-    function appendBubble(column, type, label, text) {
+    
+    function openModal(imageSrc) {
+      const modal = document.getElementById("imageModal");
+      const modalImg = document.getElementById("modalImage");
+      modal.style.display = "flex";
+      modalImg.src = imageSrc;
+    }
+    function closeModal() {
+      document.getElementById("imageModal").style.display = "none";
+    }
+    function appendBubble(column, type, label, content) {
       const bubble = document.createElement("div");
       bubble.classList.add("bubble", type);
-      bubble.innerHTML = `<strong>${label}:</strong> ${text}`;
+      bubble.innerHTML = `<strong>${label}:</strong> ${content}`;
       column.appendChild(bubble);
       column.scrollTop = column.scrollHeight;
+
+      const img = bubble.querySelector("img");
+      if (img) {
+        img.addEventListener("click", () => openModal(img.src));
+      }
     }
+  
+    // Append a bubble to a given column
+    // function appendBubble(column, type, label, text) {
+    //   const bubble = document.createElement("div");
+    //   bubble.classList.add("bubble", type);
+    //   bubble.innerHTML = `<strong>${label}:</strong> ${text}`;
+    //   column.appendChild(bubble);
+    //   column.scrollTop = column.scrollHeight;
+    // }
 
     // Start recording audio
     async function startRecording() {
@@ -206,7 +257,7 @@
     formData.append("recording", audioBlob, "recording.webm");
 
     try {
-      const response = await fetch("http://10.32.3.152:8005/transcribe", {
+      const response = await fetch("http://10.32.7.223:8005/transcribe", {
         method: "POST",
         body: formData,
       });
@@ -230,7 +281,7 @@
                 ? JSON.stringify({ query: cmdObj.additional })
                 : null;
 
-            const res = await fetch(`http://10.32.3.152:8000/${command}`, {
+            const res = await fetch(`http://10.32.7.223:8000/${command}`, {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: requestBody,
@@ -258,18 +309,17 @@
       }
 
       appendBubble(userColumn, "user", "Voice", transcript);
-      appendBubble(systemColumn, "system", "Voice", systemResponse);
+      appendBubble(systemColumn, "system", "System", systemResponse);
 
-      // speak out the system response 
-      
-      speakText(systemResponse);
+      // speak out the system response except the <img tag
+      speakText(systemResponse.replace(/<img[^>]*>/g, ""));
 
       if (systemResponse.includes("screenshot")) {
         const imageElement = document.createElement("img");
         imageElement.src = imageUrl;
         imageElement.style.maxWidth = "100%";
         imageElement.style.borderRadius = "8px";
-        appendBubble(systemColumn, "system", "Voice", imageElement.outerHTML);
+        appendBubble(systemColumn, "system", "system", imageElement.outerHTML);
       }
       if (systemResponse == "None") {
         speakText("Sorry, I didn't get that. Can you please repeat?");
