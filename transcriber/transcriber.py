@@ -30,7 +30,7 @@ COMMANDS = [
     (["open browser", "open page", "open new page"], "open_new_window   "),
     (["close browser", "shutdown browser"], "close_browser"),
     (["close current window", "close window"], "close_current_window"),
-    (["open camera"], "capture"),
+    (["open camera", "open the camera"], "capture"),
     (["take screenshot", "take a screenshot"], "screenshot"),
     (
         [
