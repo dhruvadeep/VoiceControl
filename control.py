@@ -6,6 +6,7 @@ import sys
 import time
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+from typing import Union
 
 import psutil
 import yaml
@@ -55,7 +56,7 @@ executor = ThreadPoolExecutor(max_workers=4)
 local_ip = ""
 
 
-def get_local_ip():
+def get_local_ip() -> str:
     """Return the local IP address (e.g. 192.168.x.x)."""
     try:
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -63,11 +64,11 @@ def get_local_ip():
         ip = s.getsockname()[0]
         s.close()
         return ip
-    except:
+    except Exception:
         return "127.0.0.1"
 
 
-def update_config():
+def update_config() -> None:
     """Update Application/config.yaml so that 'host' entries match the current local IP."""
     global local_ip
     config_path = Path("Application/config.yaml")
@@ -83,7 +84,7 @@ def update_config():
         yaml.dump(config, f)
 
 
-def run_service(service_name):
+def run_service(service_name: str) -> None:
     """
     Runs the service by executing each command in the service's 'commands' list.
     If the command includes 'uvicorn', 'hello.py', 'transcriber.py', or 'aggregator.py',
@@ -97,10 +98,7 @@ def run_service(service_name):
         os.chdir(service["path"])
         for cmd in service["commands"]:
             # Check if this command should be run in the background
-            if any(
-                x in cmd
-                for x in ["uvicorn", "hello.py", "transcriber.py", "aggregator.py"]
-            ):
+            if any(x in cmd for x in ["uvicorn", "hello.py", "transcriber.py", "aggregator.py"]):
                 process = subprocess.Popen(
                     cmd,
                     shell=True,
@@ -115,7 +113,7 @@ def run_service(service_name):
         os.chdir(original_dir)
 
 
-def stop_service(service_name):
+def stop_service(service_name: str) -> bool:
     """Stops the service by killing its subprocess and any children."""
     if service_name in processes:
         try:
@@ -126,12 +124,12 @@ def stop_service(service_name):
             parent.kill()
             del processes[service_name]
             return True
-        except:
+        except Exception:
             return False
     return False
 
 
-def get_service_status():
+def get_service_status() -> dict[str, dict[str, Union[bool, str, int]]]:
     """Return a dict with running status, host, port, and PID for each service."""
     status = {}
     for service_name, data in SERVICES.items():
@@ -142,7 +140,7 @@ def get_service_status():
                 # If we can fetch the psutil.Process(pid), it's running
                 psutil.Process(pid)
                 running = True
-            except:
+            except psutil.NoSuchProcess:
                 # If it fails, the process isn't actually running
                 del processes[service_name]
         status[service_name] = {
@@ -154,7 +152,7 @@ def get_service_status():
     return status
 
 
-def print_status():
+def print_status() -> None:
     """Pretty-print the status of all services."""
     status = get_service_status()
     print("\n📡 Service Status:")
@@ -166,7 +164,7 @@ def print_status():
         print(f"{name:<12} | {state:<8} | {endpoint:<25} | {info['pid'] or 'N/A'}")
 
 
-def show_menu():
+def show_menu() -> None:
     """Display the menu of control options."""
     print("\n🔧 Control Panel 🔧")
     print("1. Validate (Start) All Services Sequentially")
@@ -183,12 +181,11 @@ def show_menu():
     print(f"{stop_start + len(SERVICES)}. Exit")
 
 
-def handle_choice(choice):
+def handle_choice(choice: str) -> None:
     """
     Parse the user's numeric choice and call the appropriate
     function(s) to start/stop services or print status.
     """
-    max_stop = 3 + len(SERVICES) * 2
     if choice == "1":
         start_all_services()
     elif choice == "2":
@@ -217,7 +214,7 @@ def handle_choice(choice):
         print("❌ Invalid choice")
 
 
-def start_all_services():
+def start_all_services() -> None:
     """
     Starts all services *one by one*, in a specific order:
     browser → hardware → transcriber → aggregator
@@ -235,7 +232,7 @@ def start_all_services():
     print("✅ All services have been started. Use option 3 to check status.")
 
 
-def stop_all_services():
+def stop_all_services() -> None:
     """Stop all running services."""
     print("\n🛑 Stopping all services...")
     for svc in list(processes.keys()):
@@ -243,7 +240,7 @@ def stop_all_services():
     print("✅ All services have been stopped. Use option 3 to check status.")
 
 
-def start_service(service_name):
+def start_service(service_name: str) -> None:
     """Start a single service (placed in the background if it matches our condition)."""
     executor.submit(run_service, service_name)
     print(f"✅ {service_name} starting in the background...")
@@ -251,7 +248,7 @@ def start_service(service_name):
     print("Use option 3 to check status.")
 
 
-def main():
+def main() -> None:
     global local_ip
     local_ip = get_local_ip()
     print(f"🔗 Detected Local IP: {local_ip}")

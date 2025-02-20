@@ -3,7 +3,6 @@ from io import BytesIO
 import numpy as np
 import uvicorn
 import whisper
-from API_calls import *
 from fastapi import FastAPI, File, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import validate_call
@@ -21,8 +20,8 @@ APP.add_middleware(
 DEVICE = "cpu"
 try:
     MODEL = whisper.load_model("base.en", DEVICE)
-except:
-    MODEL = whisper.load_audio("base.en", "cpu")
+except Exception:
+    MODEL = whisper.load_audio("base.en")
 
 # incomplete: need to add more commands
 COMMANDS = [
@@ -89,12 +88,7 @@ def commands(transcription: str) -> dict[str : list[dict[str:str]]] | None:
 async def transcribe(recording: UploadFile = File(...)):
     audio = await recording.read()
     audio_buffer = BytesIO(audio)
-    audio_segment = (
-        AudioSegment.from_file(audio_buffer)
-        .set_frame_rate(16000)
-        .set_channels(1)
-        .set_sample_width(2)
-    )
+    audio_segment = AudioSegment.from_file(audio_buffer).set_frame_rate(16000).set_channels(1).set_sample_width(2)
     samples = np.array(audio_segment.get_array_of_samples(), dtype=np.float32) / 32768
     result = MODEL.transcribe(
         samples,

@@ -1,3 +1,4 @@
+# Default Imports
 import os
 
 import requests
@@ -7,13 +8,6 @@ from fastapi import FastAPI, HTTPException, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
-
-###############################################################################
-# 1. Read Configuration from config.yaml
-###############################################################################
-# Make sure you have `PyYAML` installed: pip install pyyaml
-# If you want to customize the config path, you can do so via an environment
-# variable or pass it as a command-line argument, etc.
 
 CONFIG_FILE_PATH = os.getenv("CONFIG_FILE_PATH", "config.yaml")
 
@@ -147,9 +141,7 @@ def new_window_and_search(query: SearchQuery):
     Proxy to /browser/new_window_and_search on the browser service.
     """
     try:
-        resp = requests.post(
-            f"{BROWSER_URL}/browser/new_window_and_search", json=query.dict()
-        )
+        resp = requests.post(f"{BROWSER_URL}/browser/new_window_and_search", json=query.dict())
         return resp.json()
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
