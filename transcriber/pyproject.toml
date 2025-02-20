@@ -9,8 +9,31 @@ dependencies = [
     "openai-whisper>=20240930",
     "pydub>=0.25.1",
     "python-multipart>=0.0.20",
+    "ruff>=0.9.7",
     "uvicorn>=0.34.0",
 ]
 
 [[tool.uv.index]]
 url = "https://github.com/openai/whisper"
+
+[tool.ruff]
+line-length = 120
+exclude = [
+    "build",
+    "dist",
+    "venv",
+    ".tox",
+    ".git",
+    ".mypy_cache",
+    ".pytest_cache",
+    "__pycache__",
+    ".vscode",
+    ".idea",
+    ".mypy_cache",
+    ".pytest_cache",
+    ".vscode",
+    ".idea",
+]
+
+[tool.ruff.lint]
+select = ["ANN001", "ANN002", "ANN003"]

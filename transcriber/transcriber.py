@@ -62,7 +62,7 @@ COMMANDS = [
 
 
 @validate_call
-def commands(transcription: str) -> dict[str : list[dict[str:str]]] | None:
+def commands(transcription: str) -> dict:
     transcription = transcription.lower()
     user_instructions = []
     for i in transcription.split("and"):

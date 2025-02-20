@@ -1,6 +1,8 @@
+from typing import Optional
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from playwright.async_api import Browser, BrowserContext, Page, async_playwright
+from playwright.async_api import Browser, BrowserContext, Page, Playwright, async_playwright
 from pydantic import BaseModel
 
 
@@ -12,23 +14,22 @@ APP = FastAPI()
 
 APP.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "*"
-    ],  # For production, specify your allowed domain(s) instead of "*"
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-PLAYWRIGHT = None
-BROWSER: Browser = None
-CONTEXT: BrowserContext = None
+
+PLAYWRIGHT: Optional[Playwright] = None
+BROWSER: Optional[Browser] = None
+CONTEXT: Optional[BrowserContext] = None
 
 SEARCH_URL = "https://www.bing.com/search?q="
 
 
 @APP.on_event("startup")
-async def startup():
+async def startup() -> None:
     """
     On application startup:
       1. Launch async Playwright.
@@ -43,7 +44,7 @@ async def startup():
 
 
 @APP.on_event("shutdown")
-async def shutdown():
+async def shutdown() -> None:
     """
     On application shutdown, close Playwright properly.
     """
@@ -53,18 +54,24 @@ async def shutdown():
 
 
 @APP.post("/browser/new_window_and_search")
-async def new_window_and_search(query: SearchQuery):
+async def new_window_and_search(query: SearchQuery) -> dict:
+    """
+    Opens a new window and performs a search.
+    """
     await open_new_window()
     return await search(query)
 
 
 @APP.post("/browser/open_new_window")
-async def open_new_window():
+async def open_new_window() -> dict:
     """
     Opens a new page (window) in the existing browser context,
     limited to 5 pages by default.
     """
     global CONTEXT
+    if CONTEXT is None:
+        return {"response": "Browser context is not initialized."}
+
     try:
         if len(CONTEXT.pages) >= 5:
             raise Exception("Cannot open more windows (limit reached).")
@@ -75,12 +82,15 @@ async def open_new_window():
 
 
 @APP.post("/browser/search")
-async def search(query: SearchQuery):
+async def search(query: SearchQuery) -> dict:
     """
     Performs a search on the most recently opened page.
     If no pages are open, it will create a new one and perform the search.
     """
     global CONTEXT
+    if CONTEXT is None:
+        return {"response": "Browser context is not initialized."}
+
     if len(CONTEXT.pages) == 0:
         # If no pages exist, open a new window automatically
         await open_new_window()
@@ -92,11 +102,14 @@ async def search(query: SearchQuery):
 
 
 @APP.post("/browser/close_current_window")
-async def close_current_window():
+async def close_current_window() -> dict:
     """
     Closes the most recently opened window if any exist.
     """
     global CONTEXT
+    if CONTEXT is None:
+        return {"response": "Browser context is not initialized."}
+
     if len(CONTEXT.pages) == 0:
         return {"response": "No open windows to close."}
 
@@ -105,16 +118,16 @@ async def close_current_window():
 
 
 @APP.post("/browser/close_browser")
-async def close_browser():
+async def close_browser() -> dict:
     """
     Closes all open pages in the current context.
-    (Does NOT close the entire Playwright instance,
-    but you can shut down the entire app to do that.)
+    (Does NOT close the entire Playwright instance;
+     shutting down the entire app will do that.)
     """
     global CONTEXT
+    if CONTEXT is None:
+        return {"response": "Browser context is not initialized."}
+
     for page in CONTEXT.pages:
         await page.close()
     return {"response": "Closed all browser windows."}
-
-
-# Run with: uvicorn this_file_name:APP --host 0.0.0.0 --port 8000 --reload

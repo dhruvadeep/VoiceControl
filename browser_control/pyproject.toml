@@ -7,5 +7,28 @@ requires-python = ">=3.12.5"
 dependencies = [
     "fastapi[standard]>=0.115.8",
     "playwright>=1.50.0",
+    "ruff>=0.9.7",
     "uvicorn>=0.34.0",
 ]
+
+[tool.ruff]
+line-length = 120
+exclude = [
+    "build",
+    "dist",
+    "venv",
+    ".tox",
+    ".git",
+    ".mypy_cache",
+    ".pytest_cache",
+    "__pycache__",
+    ".vscode",
+    ".idea",
+    ".mypy_cache",
+    ".pytest_cache",
+    ".vscode",
+    ".idea",
+]
+
+[tool.ruff.lint]
+select = ["ANN001", "ANN002", "ANN003"]
