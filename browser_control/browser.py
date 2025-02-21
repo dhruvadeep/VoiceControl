@@ -1,13 +1,12 @@
-from typing import Optional
-
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from playwright.async_api import Browser, BrowserContext, Page, Playwright, async_playwright
-from pydantic import BaseModel
+
+from models import SearchQuery
 
 
-class SearchQuery(BaseModel):
-    query: str
+class BrowserWindowLimitReachedError(Exception):
+    """Exception raised when the browser window limit is reached."""
 
 
 APP = FastAPI()
@@ -21,20 +20,21 @@ APP.add_middleware(
 )
 
 
-PLAYWRIGHT: Optional[Playwright] = None
-BROWSER: Optional[Browser] = None
-CONTEXT: Optional[BrowserContext] = None
+PLAYWRIGHT: Playwright | None = None
+BROWSER: Browser | None = None
+CONTEXT: BrowserContext | None = None
 
 SEARCH_URL = "https://www.bing.com/search?q="
+MAX_WINDOWS = 5
 
 
 @APP.on_event("startup")
 async def startup() -> None:
-    """
-    On application startup:
-      1. Launch async Playwright.
-      2. Launch a Firefox browser (change to chromium or webkit if desired).
-      3. Create a new browser context.
+    """On application startup.
+
+    1. Launch async Playwright.
+    2. Launch a Firefox browser (change to chromium or webkit if desired).
+    3. Create a new browser context.
     """
     global PLAYWRIGHT, BROWSER, CONTEXT
     PLAYWRIGHT = await async_playwright().start()
@@ -45,49 +45,58 @@ async def startup() -> None:
 
 @APP.on_event("shutdown")
 async def shutdown() -> None:
-    """
-    On application shutdown, close Playwright properly.
-    """
-    global PLAYWRIGHT
+    """On application shutdown, close Playwright properly."""
     if PLAYWRIGHT:
         await PLAYWRIGHT.stop()
 
 
 @APP.post("/browser/new_window_and_search")
 async def new_window_and_search(query: SearchQuery) -> dict:
-    """
-    Opens a new window and performs a search.
-    """
+    """Open a new window and perform a search."""
     await open_new_window()
     return await search(query)
 
 
 @APP.post("/browser/open_new_window")
 async def open_new_window() -> dict:
+    """Open a new window in the existing browser context.
+
+    Limited to 5 pages by default.
     """
-    Opens a new page (window) in the existing browser context,
-    limited to 5 pages by default.
-    """
-    global CONTEXT
     if CONTEXT is None:
         return {"response": "Browser context is not initialized."}
 
     try:
-        if len(CONTEXT.pages) >= 5:
-            raise Exception("Cannot open more windows (limit reached).")
-        await CONTEXT.new_page()
-        return {"response": "Opened a new window."}
-    except Exception as e:
+        if len(CONTEXT.pages) >= MAX_WINDOWS:
+
+            def raise_window_limit_error() -> None:
+                """Error to indicate that the maximum number of browser windows has been reached.
+
+                Raises:
+                    BrowserWindowLimitReachedError: Exception indicating the browser window limit has been reached.
+
+                """
+                raise BrowserWindowLimitReachedError
+
+            raise_window_limit_error()
+        else:
+            await CONTEXT.new_page()
+            return {"response": "Opened a new window."}
+    except BrowserWindowLimitReachedError as e:
         return {"response": str(e)}
 
 
 @APP.post("/browser/search")
 async def search(query: SearchQuery) -> dict:
+    """Perform a search on the most recently opened page.
+
+    Args:
+        query (SearchQuery): The search query to be performed.
+
+    Returns:
+        dict: A dictionary containing the response message.
+
     """
-    Performs a search on the most recently opened page.
-    If no pages are open, it will create a new one and perform the search.
-    """
-    global CONTEXT
     if CONTEXT is None:
         return {"response": "Browser context is not initialized."}
 
@@ -98,15 +107,13 @@ async def search(query: SearchQuery) -> dict:
     # Get the last page in the context
     page: Page = CONTEXT.pages[-1]
     await page.goto(SEARCH_URL + query.query)
-    return {"response": f"Searching for {query.query}"}
+    results = await page.locator("h2 a").all_text_contents()
+    return {"response": f"Searching for {query.query}. Top results are : {results[:5]}"}
 
 
 @APP.post("/browser/close_current_window")
 async def close_current_window() -> dict:
-    """
-    Closes the most recently opened window if any exist.
-    """
-    global CONTEXT
+    """Close the most recently opened window if any exist."""
     if CONTEXT is None:
         return {"response": "Browser context is not initialized."}
 
@@ -119,12 +126,11 @@ async def close_current_window() -> dict:
 
 @APP.post("/browser/close_browser")
 async def close_browser() -> dict:
-    """
-    Closes all open pages in the current context.
+    """Close all open pages in the current context.
+
     (Does NOT close the entire Playwright instance;
-     shutting down the entire app will do that.)
+     shutting down the entire app will do that.).
     """
-    global CONTEXT
     if CONTEXT is None:
         return {"response": "Browser context is not initialized."}
 

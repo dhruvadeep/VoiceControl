@@ -31,4 +31,4 @@ exclude = [
 ]
 
 [tool.ruff.lint]
-select = ["ANN001", "ANN002", "ANN003"]
+select = ["ALL"]
