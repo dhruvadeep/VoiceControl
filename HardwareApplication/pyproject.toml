@@ -11,4 +11,5 @@ dependencies = [
     "psutil>=7.0.0",
     "pyautogui>=0.9.54",
     "pyscreeze>=1.0.1",
+    "ruff>=0.9.7",
 ]

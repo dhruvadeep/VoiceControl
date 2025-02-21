@@ -98,12 +98,7 @@ async def transcribe(recording: Annotated[UploadFile, File(...)]) -> FinalRespon
     """Take recording as input and send back transcription and appropriate commands."""
     audio = await recording.read()
     audio_buffer = BytesIO(audio)
-    audio_segment = (
-        AudioSegment.from_file(audio_buffer)
-        .set_frame_rate(16000)
-        .set_channels(1)
-        .set_sample_width(2)
-    )
+    audio_segment = AudioSegment.from_file(audio_buffer).set_frame_rate(16000).set_channels(1).set_sample_width(2)
     samples = np.array(audio_segment.get_array_of_samples(), dtype=np.float32) / 32768
     result = MODEL.transcribe(
         samples,

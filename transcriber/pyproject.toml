@@ -10,6 +10,7 @@ dependencies = [
     "pydub>=0.25.1",
     "python-multipart>=0.0.20",
     "ruff>=0.9.7",
+    "ruff>=0.9.7",
     "uvicorn>=0.34.0",
 ]
 
