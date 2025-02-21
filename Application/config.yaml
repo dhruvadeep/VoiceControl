@@ -1,10 +1,12 @@
 aggregator_service:
-  host: 10.32.3.152
+  host: 0.0.0.0
   port: 8000
   reload: true
 browser_service:
-  host: 10.32.3.152
+  host: 0.0.0.0
   port: 8001
 hardware_service:
-  host: 10.32.3.152
+  host: 0.0.0.0
   port: 8003
+
+# dummy host values
