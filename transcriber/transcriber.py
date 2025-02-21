@@ -1,4 +1,6 @@
+"""Takes audio recording as input and produces transcription and appropriate commands associated with it."""
 from io import BytesIO
+from typing import Annotated
 
 import numpy as np
 import uvicorn
@@ -7,6 +9,8 @@ from fastapi import FastAPI, File, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import validate_call
 from pydub.audio_segment import AudioSegment
+
+from models import CommandListResponse, CommandResponse, FinalResponse
 
 APP = FastAPI()
 APP.add_middleware(
@@ -17,11 +21,14 @@ APP.add_middleware(
     allow_headers=["*"],
 )
 
+class CannotLoadModelError(Exception):
+    """CannotLoadModelError occurs when you are facing issues while loading model."""
+
 DEVICE = "cpu"
 try:
     MODEL = whisper.load_model("base.en", DEVICE)
-except Exception:
-    MODEL = whisper.load_audio("base.en")
+except CannotLoadModelError:
+    MODEL = whisper.load_audio("base.en", "cpu")
 
 # incomplete: need to add more commands
 COMMANDS = [
@@ -62,30 +69,33 @@ COMMANDS = [
 
 
 @validate_call
-def commands(transcription: str) -> dict:
+def commands(transcription: str) -> CommandListResponse:
+    """Take transcription as input and get commands as output."""
     transcription = transcription.lower()
-    user_instructions = []
-    for i in transcription.split("and"):
-        for j in i.split("."):
-            for k in j.split(","):
-                user_instructions.append(k)
+    user_instructions = [
+    k for i in transcription.split("and")
+      for j in i.split(".")
+      for k in j.split(",")
+]
+
     responses = []
     for user_instruction in user_instructions:
         for queries, command in COMMANDS:
             for query in queries:
                 if query in user_instruction:
-                    additional_information = user_instruction.split(query)[1]
-                    response = {
-                        "command": command,
-                        "additional": additional_information,
-                    }
+                    try:
+                        additional_information = user_instruction.split(query)[1]
+                    except IndexError:
+                        additional_information = ""
+                    response = CommandResponse(command=command, additional=additional_information)
                     responses.append(response)
                     break
-    return {"response": responses}
+    return CommandListResponse(commands=responses)
 
 
 @APP.post("/transcribe")
-async def transcribe(recording: UploadFile = File(...)):
+async def transcribe(recording: Annotated[UploadFile, File(...)]) -> FinalResponse:
+    """Take recording as input and send back transcription and appropriate commands."""
     audio = await recording.read()
     audio_buffer = BytesIO(audio)
     audio_segment = AudioSegment.from_file(audio_buffer).set_frame_rate(16000).set_channels(1).set_sample_width(2)
@@ -95,12 +105,10 @@ async def transcribe(recording: UploadFile = File(...)):
         temperature=0,
         condition_on_previous_text=False,
         word_timestamps=True,
-        # hallucination_silence_threshold=0.7,
-        # no_speech_threshold=0.8
     )
     transcription = result["text"].lower()
     response = commands(transcription)
-    return {"response": response, "message": transcription}
+    return FinalResponse(response=response, message=transcription)
 
 
 if __name__ == "__main__":

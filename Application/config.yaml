@@ -8,3 +8,5 @@ browser_service:
 hardware_service:
   host: 10.32.17.184
   port: 8003
+
+# dummy host values
