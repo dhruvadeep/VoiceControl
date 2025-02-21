@@ -26,7 +26,7 @@ SERVICES = {
         "path": "HardwareApplication",
         "commands": [
             "uv sync",
-            "uv run hello.py",
+            "uv run hardware.py",
         ],
         "port": 8003,
         "config_key": "hardware_service",
@@ -87,7 +87,7 @@ def update_config() -> None:
 def run_service(service_name: str) -> None:
     """
     Runs the service by executing each command in the service's 'commands' list.
-    If the command includes 'uvicorn', 'hello.py', 'transcriber.py', or 'aggregator.py',
+    If the command includes 'uvicorn', 'hardware.py', 'transcriber.py', or 'aggregator.py',
     it will be started via Popen (in the background).
     Otherwise, it will be run via subprocess.run() (blocking).
     """
@@ -98,7 +98,7 @@ def run_service(service_name: str) -> None:
         os.chdir(service["path"])
         for cmd in service["commands"]:
             # Check if this command should be run in the background
-            if any(x in cmd for x in ["uvicorn", "hello.py", "transcriber.py", "aggregator.py"]):
+            if any(x in cmd for x in ["uvicorn", "hardware.py", "transcriber.py", "aggregator.py"]):
                 process = subprocess.Popen(
                     cmd,
                     shell=True,

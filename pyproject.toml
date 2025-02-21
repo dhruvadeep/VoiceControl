@@ -4,7 +4,12 @@ version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12"
-dependencies = ["psutil>=7.0.0", "pyyaml>=6.0.2", "ruff>=0.9.6"]
+dependencies = [
+    "just>=0.8.162",
+    "psutil>=7.0.0",
+ "pyyaml>=6.0.2",
+ "ruff>=0.9.6",
+]
 
 # ruff
 [tool.ruff]
@@ -27,4 +32,5 @@ exclude = [
 ]
 
 [tool.ruff.lint]
-select = ["ANN001", "ANN002", "ANN003"]
+select = ["ALL"]
+#"ANN001", "ANN002", "ANN003"
