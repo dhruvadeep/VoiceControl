@@ -262,14 +262,14 @@
         body: formData,
       });
       const data = await response.json();
-
+      console.log(data);
       const transcript = data.message.trim();
       let systemResponse = "None";
 
-      if (data.response?.response?.length > 0) {
+      if (data.response?.commands?.length > 0) {
         const responses = [];
-
-        for (const cmdObj of data.response.response) {
+        
+        for (const cmdObj of data.response.commands) {
           const command = cmdObj.command;
           let resText = "Error";
           let isImageResponse = false;

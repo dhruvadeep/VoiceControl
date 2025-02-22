@@ -6,6 +6,7 @@ readme = "README.md"
 requires-python = ">=3.12.5"
 dependencies = [
     "fastapi>=0.115.8",
+    "loguru>=0.7.3",
     "openai-whisper>=20240930",
     "pydub>=0.25.1",
     "python-multipart>=0.0.20",

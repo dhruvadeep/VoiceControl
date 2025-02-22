@@ -9,7 +9,7 @@ from fastapi import FastAPI, File, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import validate_call
 from pydub.audio_segment import AudioSegment
-
+from loguru import logger
 from models import CommandListResponse, CommandResponse, FinalResponse
 
 APP = FastAPI()
@@ -20,6 +20,7 @@ APP.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+logger.add("logs.txt", rotation="500 MB")
 
 class CannotLoadModelError(Exception):
     """CannotLoadModelError occurs when you are facing issues while loading model."""
@@ -37,7 +38,7 @@ COMMANDS = [
     (["close browser", "shutdown browser"], "close_browser"),
     (["close current window", "close window"], "close_current_window"),
     (["open camera", "open the camera"], "capture"),
-    (["take screenshot", "take a screenshot"], "screenshot"),
+    (["take screenshot", "take a screenshot", "take screen shot", "take a screen shot"], "screenshot"),
     (
         [
             "show ram info",
@@ -87,15 +88,18 @@ def commands(transcription: str) -> CommandListResponse:
                         additional_information = user_instruction.split(query)[1]
                     except IndexError:
                         additional_information = ""
+                        logger.info("command recorded: "+command)
                     response = CommandResponse(command=command, additional=additional_information)
                     responses.append(response)
                     break
+    logger.info("sending commands")
     return CommandListResponse(commands=responses)
 
 
 @APP.post("/transcribe")
 async def transcribe(recording: Annotated[UploadFile, File(...)]) -> FinalResponse:
     """Take recording as input and send back transcription and appropriate commands."""
+    logger.info("transcribe request recieved")
     audio = await recording.read()
     audio_buffer = BytesIO(audio)
     audio_segment = AudioSegment.from_file(audio_buffer).set_frame_rate(16000).set_channels(1).set_sample_width(2)
@@ -108,6 +112,7 @@ async def transcribe(recording: Annotated[UploadFile, File(...)]) -> FinalRespon
     )
     transcription = result["text"].lower()
     response = commands(transcription)
+    logger.info("sending final response: " + transcription)
     return FinalResponse(response=response, message=transcription)
 
 

@@ -173,3 +173,9 @@ cython_debug/
 # vis folder
 vis/
 gradio_ui/
+
+# ruff cache
+.ruff_cache
+
+# logs
+logs.txt
