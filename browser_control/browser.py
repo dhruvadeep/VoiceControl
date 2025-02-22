@@ -3,7 +3,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from playwright.async_api import Browser, BrowserContext, Page, Playwright, async_playwright
 
 from models import SearchQuery
-
+from loguru import logger
+logger.add("logs.txt", rotation="500 MB")
 
 class BrowserWindowLimitReachedError(Exception):
     """Exception raised when the browser window limit is reached."""
@@ -37,6 +38,7 @@ async def startup() -> None:
     3. Create a new browser context.
     """
     global PLAYWRIGHT, BROWSER, CONTEXT
+    logger.info("starting browser")
     PLAYWRIGHT = await async_playwright().start()
     # NOTE: set `headless=False` to see the browser window, or True to run in the background
     BROWSER = await PLAYWRIGHT.firefox.launch(headless=False)
@@ -47,6 +49,7 @@ async def startup() -> None:
 async def shutdown() -> None:
     """On application shutdown, close Playwright properly."""
     if PLAYWRIGHT:
+        logger.info("shutting down playwright")
         await PLAYWRIGHT.stop()
 
 
@@ -63,6 +66,7 @@ async def open_new_window() -> dict:
 
     Limited to 5 pages by default.
     """
+    logger.info("opening new window")
     if CONTEXT is None:
         return {"response": "Browser context is not initialized."}
 
@@ -97,6 +101,7 @@ async def search(query: SearchQuery) -> dict:
         dict: A dictionary containing the response message.
 
     """
+    logger.info("searching for query: "+query.query)
     if CONTEXT is None:
         return {"response": "Browser context is not initialized."}
 
@@ -114,6 +119,7 @@ async def search(query: SearchQuery) -> dict:
 @APP.post("/browser/close_current_window")
 async def close_current_window() -> dict:
     """Close the most recently opened window if any exist."""
+    logger.info("closing current window")
     if CONTEXT is None:
         return {"response": "Browser context is not initialized."}
 
@@ -132,8 +138,10 @@ async def close_browser() -> dict:
      shutting down the entire app will do that.).
     """
     if CONTEXT is None:
+        logger.info("the browser is not even initialized")
         return {"response": "Browser context is not initialized."}
 
     for page in CONTEXT.pages:
         await page.close()
+    logger.info("closing browser")
     return {"response": "Closed all browser windows."}

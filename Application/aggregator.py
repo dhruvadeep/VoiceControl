@@ -1,12 +1,16 @@
 import os
 
-import requests
+import httpx
 import uvicorn
 import yaml
 from fastapi import FastAPI, HTTPException, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
+from loguru import logger
+
+logger.add("logs.txt", rotation="500 MB")
+logger.info("aggregator starting")
 
 CONFIG_FILE_PATH = os.getenv("CONFIG_FILE_PATH", "../config.yaml")
 
@@ -50,14 +54,16 @@ def capture() -> Response:
     Returns the PNG image from the hardware service directly.
     """
     try:
-        resp = requests.get(f"{HARDWARE_URL}/capture")
+        resp = httpx.get(f"{HARDWARE_URL}/capture")
         if resp.status_code != 200:
             raise HTTPException(status_code=resp.status_code, detail=resp.text)
+        logger.info("capture request sent")
         return Response(
             content=resp.content,
             media_type=resp.headers.get("content-type", "image/png"),
         )
     except Exception as e:
+        logger.info(f"exception {e} encountered")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -68,14 +74,16 @@ def screenshot() -> Response:
     Returns the PNG screenshot directly.
     """
     try:
-        resp = requests.get(f"{HARDWARE_URL}/screenshot")
+        resp = httpx.get(f"{HARDWARE_URL}/screenshot")
         if resp.status_code != 200:
             raise HTTPException(status_code=resp.status_code, detail=resp.text)
+        logger.info("screenshot request sent")
         return Response(
             content=resp.content,
             media_type=resp.headers.get("content-type", "image/png"),
         )
     except Exception as e:
+        logger.info(f"exception {e} encountered")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -85,11 +93,13 @@ def cpu() -> JSONResponse:
     Proxy to /cpu on the hardware service.
     """
     try:
-        resp = requests.get(f"{HARDWARE_URL}/cpu")
+        resp = httpx.get(f"{HARDWARE_URL}/cpu")
         if resp.status_code != 200:
             raise HTTPException(status_code=resp.status_code, detail=resp.text)
+        logger.info("cpu info request sent")
         return JSONResponse(content=resp.json())
     except Exception as e:
+        logger.info(f"exception {e} encountered")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -99,11 +109,13 @@ def disk() -> JSONResponse:
     Proxy to /disk on the hardware service.
     """
     try:
-        resp = requests.get(f"{HARDWARE_URL}/disk")
+        resp = httpx.get(f"{HARDWARE_URL}/disk")
         if resp.status_code != 200:
             raise HTTPException(status_code=resp.status_code, detail=resp.text)
+        logger.info("disk info request sent")
         return JSONResponse(content=resp.json())
     except Exception as e:
+        logger.info(f"exception {e} encountered")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -113,11 +125,13 @@ def ram() -> JSONResponse:
     Proxy to /ram on the hardware service.
     """
     try:
-        resp = requests.get(f"{HARDWARE_URL}/ram")
+        resp = httpx.get(f"{HARDWARE_URL}/ram")
         if resp.status_code != 200:
             raise HTTPException(status_code=resp.status_code, detail=resp.text)
+        logger.info("ram info request sent")
         return JSONResponse(content=resp.json())
     except Exception as e:
+        logger.info(f"exception {e} encountered")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -127,9 +141,11 @@ def new_window_and_search(query: SearchQuery) -> dict:
     Proxy to /browser/new_window_and_search on the browser service.
     """
     try:
-        resp = requests.post(f"{BROWSER_URL}/browser/new_window_and_search", json=query.dict())
+        resp = httpx.post(f"{BROWSER_URL}/browser/new_window_and_search", json=query.dict())
+        logger.info("new window and search request sent")
         return resp.json()  # returns a dict
     except Exception as e:
+        logger.info(f"exception {e} encountered")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -139,9 +155,11 @@ def open_new_window() -> dict:
     Proxy to /browser/open_new_window on the browser service.
     """
     try:
-        resp = requests.post(f"{BROWSER_URL}/browser/open_new_window")
+        resp = httpx.post(f"{BROWSER_URL}/browser/open_new_window")
+        logger.info("open window request sent")
         return resp.json()  # returns a dict
     except Exception as e:
+        logger.info(f"exception {e} encountered")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -151,9 +169,11 @@ def search(query: SearchQuery) -> dict:
     Proxy to /browser/search on the browser service.
     """
     try:
-        resp = requests.post(f"{BROWSER_URL}/browser/search", json=query.dict())
+        resp = httpx.post(f"{BROWSER_URL}/browser/search", json=query.dict())
+        logger.info("search request sent")
         return resp.json()  # returns a dict
     except Exception as e:
+        logger.info(f"exception {e} encountered")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -163,9 +183,11 @@ def close_current_window() -> dict:
     Proxy to /browser/close_current_window on the browser service.
     """
     try:
-        resp = requests.post(f"{BROWSER_URL}/browser/close_current_window")
+        resp = httpx.post(f"{BROWSER_URL}/browser/close_current_window")
+        logger.info("close window request sent")
         return resp.json()  # returns a dict
     except Exception as e:
+        logger.info(f"exception {e} encountered")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -175,12 +197,14 @@ def close_browser() -> dict:
     Proxy to /browser/close_browser on the browser service.
     """
     try:
-        resp = requests.post(f"{BROWSER_URL}/browser/close_browser")
+        resp = httpx.post(f"{BROWSER_URL}/browser/close_browser")
+        logger.info("close browser request sent")
         return resp.json()  # returns a dict
     except Exception as e:
+        logger.info(f"exception {e} encountered")
         raise HTTPException(status_code=500, detail=str(e))
 
-
+logger.info("starting node...")
 if __name__ == "__main__":
     uvicorn.run(
         "aggregator:app",

@@ -170,4 +170,12 @@ cython_debug/
 # PyPI configuration file
 .pypirc
 
-.ruffcache/
+# vis folder
+vis/
+gradio_ui/
+
+# ruff cache
+.ruff_cache
+
+# logs
+logs.txt
