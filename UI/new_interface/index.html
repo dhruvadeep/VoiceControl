@@ -257,7 +257,7 @@
     formData.append("recording", audioBlob, "recording.webm");
 
     try {
-      const response = await fetch("http://10.32.7.223:8005/transcribe", {
+      const response = await fetch("http://10.32.3.157:8005/transcribe", {
         method: "POST",
         body: formData,
       });
@@ -281,7 +281,7 @@
                 ? JSON.stringify({ query: cmdObj.additional })
                 : null;
 
-            const res = await fetch(`http://10.32.7.223:8000/${command}`, {
+            const res = await fetch(`http://10.32.3.157:8000/${command}`, {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: requestBody,
