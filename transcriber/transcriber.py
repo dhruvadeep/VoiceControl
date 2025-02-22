@@ -1,4 +1,5 @@
 """Takes audio recording as input and produces transcription and appropriate commands associated with it."""
+
 from io import BytesIO
 from typing import Annotated
 
@@ -22,8 +23,10 @@ APP.add_middleware(
 )
 logger.add("logs.txt", rotation="500 MB")
 
+
 class CannotLoadModelError(Exception):
     """CannotLoadModelError occurs when you are facing issues while loading model."""
+
 
 DEVICE = "cpu"
 try:
@@ -73,11 +76,7 @@ COMMANDS = [
 def commands(transcription: str) -> CommandListResponse:
     """Take transcription as input and get commands as output."""
     transcription = transcription.lower()
-    user_instructions = [
-    k for i in transcription.split("and")
-      for j in i.split(".")
-      for k in j.split(",")
-]
+    user_instructions = [k for i in transcription.split("and") for j in i.split(".") for k in j.split(",")]
 
     responses = []
     for user_instruction in user_instructions:

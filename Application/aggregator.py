@@ -12,7 +12,7 @@ from loguru import logger
 logger.add("logs.txt", rotation="500 MB")
 logger.info("aggregator starting")
 
-CONFIG_FILE_PATH = os.getenv("CONFIG_FILE_PATH", "config.yaml")
+CONFIG_FILE_PATH = os.getenv("CONFIG_FILE_PATH", "../config.yaml")
 
 with open(CONFIG_FILE_PATH, "r") as f:
     config_data = yaml.safe_load(f)

@@ -99,13 +99,22 @@ def run_service(service_name: str) -> None:
         for cmd in service["commands"]:
             # Check if this command should be run in the background
             if any(x in cmd for x in ["uvicorn", "hardware.py", "transcriber.py", "aggregator.py"]):
-                process = subprocess.Popen(
-                    cmd,
-                    shell=True,
-                    stdout=subprocess.DEVNULL,
-                    stderr=subprocess.DEVNULL,
-                )
+                if os.name == "nt":  # Windows
+                    process = subprocess.Popen(f"start cmd /k {cmd}", shell=True)
+                elif os.uname().sysname == "Darwin":  # macOS
+                    process = subprocess.Popen(
+                        f'osascript -e \'tell application "Terminal" to do script "{cmd}"\'', shell=True
+                    )
+                else:  # Linux
+                    process = subprocess.Popen(f"gnome-terminal -- {cmd}", shell=True)
                 processes[service_name] = process.pid
+                # process = subprocess.Popen(
+                #     cmd,
+                #     shell=True,
+                #     stdout=subprocess.DEVNULL,
+                #     stderr=subprocess.DEVNULL,
+                # )
+
             else:
                 # Blocking command, e.g. 'uv sync'
                 subprocess.run(cmd, shell=True, check=True)
@@ -248,28 +257,28 @@ def start_service(service_name: str) -> None:
     print("Use option 3 to check status.")
 
 
-def main() -> None:
+def main(choice) -> None:
+    """Take a number as input and perform the corresponding action.
+
+    Choices:
+    1. Validate (Start) All Services Sequentially
+    2. Stop All Services
+    3. List Running Services
+    """
     global local_ip
     local_ip = get_local_ip()
-    print(f"🔗 Detected Local IP: {local_ip}")
+    # this line can be used,if needed print(f"🔗 Detected Local IP: {local_ip}")
     update_config()
-
-    while True:
-        show_menu()
-        try:
-            choice = input("➡️  Select option: ")
-            handle_choice(choice)
-        except KeyboardInterrupt:
-            print("\n👋 Exiting...")
-            sys.exit(0)
-        except Exception as e:
-            print(f"❌ Error: {e}")
-        input("\nPress Enter to continue...")
+    try:
+        handle_choice(choice)
+    except KeyboardInterrupt:
+        print("\n👋 Exiting...")
 
 
 if __name__ == "__main__":
     try:
-        main()
+        main("1")
+        while True:
+            pass
     except KeyboardInterrupt:
-        print("\n👋 Exiting...")
-        sys.exit(0)
+        stop_all_services()

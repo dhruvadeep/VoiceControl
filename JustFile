@@ -1,0 +1,29 @@
+set shell := ["bash", "-cu"]
+set dotenv-load
+
+# Set the default recipe
+default: build
+
+# A recipe to build the project
+build_all:
+    echo "Building the requirements..."
+    uv sync
+    cd browser_control && uv sync && uv run playwright install firefox
+    cd HardwareApplication& && uv sync
+    cd Application && uv sync
+    echo "Requirements built successfully"
+
+# A recipe to run the project
+run_all:
+    echo "starting the project..."
+    
+
+
+# A recipe to test the project
+test:
+    echo "Testing the project..."
+
+# A recipe to clean the project
+clean:
+    echo "Cleaning the project..."
+
