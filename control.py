@@ -69,9 +69,9 @@ def get_local_ip() -> str:
 
 
 def update_config() -> None:
-    """Update Application/config.yaml so that 'host' entries match the current local IP."""
+    """Update config.yaml so that 'host' entries match the current local IP."""
     global local_ip
-    config_path = Path("Application/config.yaml")
+    config_path = Path("config.yaml")
     with open(config_path) as f:
         config = yaml.safe_load(f)
 

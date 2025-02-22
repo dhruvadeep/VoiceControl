@@ -8,7 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
-CONFIG_FILE_PATH = os.getenv("CONFIG_FILE_PATH", "config.yaml")
+CONFIG_FILE_PATH = os.getenv("CONFIG_FILE_PATH", "../config.yaml")
 
 with open(CONFIG_FILE_PATH, "r") as f:
     config_data = yaml.safe_load(f)
