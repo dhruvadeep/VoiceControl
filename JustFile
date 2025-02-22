@@ -2,11 +2,15 @@ set shell := ["bash", "-cu"]
 set dotenv-load
 
 # Set the default recipe
-default: build
+default: hello
 
+@hello:
+    echo "Hello, Welcome to Voice-Control System"
+    ls
 # A recipe to build the project
 build_all:
     echo "Building the requirements..."
+    echo $PWD
     uv sync
     cd browser_control && uv sync && uv run playwright install firefox
     cd HardwareApplication& && uv sync
@@ -16,7 +20,7 @@ build_all:
 # A recipe to run the project
 run_all:
     echo "starting the project..."
-    
+    uv run initialisation.py
 
 
 # A recipe to test the project

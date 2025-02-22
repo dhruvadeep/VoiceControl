@@ -11,6 +11,7 @@ from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.responses import FileResponse, JSONResponse
 from starlette.responses import Response as StarletteResponse
 from loguru import logger
+
 app = FastAPI()
 
 logger.add("logs.txt", rotation="500 MB")
