@@ -13,8 +13,9 @@ build_all:
     echo $PWD
     uv sync
     cd browser_control && uv sync && uv run playwright install firefox
-    cd HardwareApplication& && uv sync
+    cd HardwareApplication && uv sync
     cd Application && uv sync
+    cd transcriber && uv sync
     echo "Requirements built successfully"
 
 # A recipe to run the project

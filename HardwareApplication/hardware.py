@@ -82,6 +82,8 @@ async def capture() -> Response:
 
     # Lock the camera access to avoid race conditions
     with camera_lock:
+        for _ in range(10):
+            ret, frame = camera.read()
         ret, frame = camera.read()
 
     if not ret:
