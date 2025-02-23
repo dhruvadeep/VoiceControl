@@ -170,6 +170,8 @@
     const userColumn = document.getElementById("user-column");
     const systemColumn = document.getElementById("system-column");
     const clearButton = document.getElementById("clear-button");
+    const transcriber_ip = "http://10.32.1.209";
+    const aggregator_ip = "http://10.32.1.209";
 
     // Speech synthesis function
     function speakText(text) {
@@ -257,7 +259,7 @@
     formData.append("recording", audioBlob, "recording.webm");
 
     try {
-      const response = await fetch("http://10.32.7.223:8005/transcribe", {
+      const response = await fetch(transcriber_ip+":8005/transcribe", {
         method: "POST",
         body: formData,
       });
@@ -281,7 +283,7 @@
                 ? JSON.stringify({ query: cmdObj.additional })
                 : null;
 
-            const res = await fetch(`http://10.32.7.223:8000/${command}`, {
+            const res = await fetch(aggregator_ip+`:8000/${command}`, {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: requestBody,
