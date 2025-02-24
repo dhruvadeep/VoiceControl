@@ -181,4 +181,3 @@ gradio_ui/
 logs.txt
 
 # png files inside images folder in hardware
-*.png

@@ -1,4 +1,4 @@
-"""Takes audio recording as input and produces transcription and appropriate commands associated with it."""
+"""Audio transcription and command extraction service using FastAPI and PyYAML."""
 
 from io import BytesIO
 from typing import Annotated
@@ -6,13 +6,13 @@ from typing import Annotated
 import numpy as np
 import uvicorn
 import whisper
+import yaml
 from fastapi import FastAPI, File, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from loguru import logger
+from models import CommandListResponse, CommandResponse, FinalResponse
 from pydantic import validate_call
 from pydub.audio_segment import AudioSegment
-
-from models import CommandListResponse, CommandResponse, FinalResponse
 
 APP = FastAPI()
 APP.add_middleware(
@@ -22,97 +22,119 @@ APP.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-logger.add("logs.txt", rotation="500 MB")
 
 
 class CannotLoadModelError(Exception):
-    """CannotLoadModelError occurs when you are facing issues while loading model."""
+    """CannotLoadModelError occurs when you are facing issues while loading a model."""
 
 
 DEVICE = "cpu"
-try:
-    MODEL = whisper.load_model("base.en", DEVICE)
-except CannotLoadModelError:
-    MODEL = whisper.load_audio("base.en", "cpu")
 
-# incomplete: need to add more commands
-COMMANDS = [
-    (["search for", "search", "bing"], "search"),
-    (["open browser", "open page", "open new page"], "open_new_window   "),
-    (["close browser", "shutdown browser"], "close_browser"),
-    (["close current window", "close window"], "close_current_window"),
-    (["open camera", "open the camera"], "capture"),
-    (["take screenshot", "take a screenshot", "take screen shot", "take a screen shot"], "screenshot"),
-    (
-        [
-            "show ram info",
-            "get ram info",
-            "show ram usage",
-            "get ram usage",
-            "ram",
-            "take ram",
-        ],
-        "ram",
-    ),
-    (
-        ["show disk info", "get disk info", "show disk usage", "get disk usage"],
-        "get_disk",
-    ),
-    (["show cpu usage", "get cpu usage"], "get_cpu_usage"),
-    (["show cpu info", "get cpu info"], "get_cpu_info"),
-    (
-        [
-            "show system info",
-            "get system info",
-            "show hardware info",
-            "get hardware info",
-        ],
-        "get_all",
-    ),
-    (["show life", "show life help"], "get_all"),
-]
+try:
+    MODEL = whisper.load_model("base.en", device=DEVICE)
+except CannotLoadModelError:
+    # Fall back in case there's a problem loading the model
+    # (This except block is a bit unusual. Possibly you meant another fallback.)
+    MODEL = whisper.load_audio("base.en", DEVICE)
+
+# ------------------------------------------------
+# Load commands from `commands.yaml`
+# ------------------------------------------------
+COMMANDS_YAML_PATH = "commands.yaml"
+
+try:
+    with open(COMMANDS_YAML_PATH, encoding="utf-8") as file:
+        YAML_COMMANDS = yaml.safe_load(file)
+except FileNotFoundError:
+    logger.error(f"Could not find {COMMANDS_YAML_PATH} file.")
+    YAML_COMMANDS = []
+
+# Flatten the YAML command structure into a list of (List[str], str) tuples.
+# Example: [ (["open browser", "start browser"], "open_browser"), ... ]
+COMMAND_LIST: list[tuple[list[str], str]] = []
+
+for category_dict in YAML_COMMANDS:
+    for _, command_dict in category_dict.items():
+        for cmd, queries in command_dict.items():
+            COMMAND_LIST.append((queries, cmd))
 
 
 @validate_call
 def commands(transcription: str) -> CommandListResponse:
-    """Take transcription as input and get commands as output."""
-    transcription = transcription.lower()
-    user_instructions = [k for i in transcription.split("and") for j in i.split(".") for k in j.split(",")]
+    """Take a transcription string as input and match it against known commands
+    loaded from the YAML file.
+
+    Returns:
+        CommandListResponse: A response object containing matched commands.
+
+    """
+    transcription_lower = transcription.lower()
+
+    # Break down user instructions on "and", ".", "," so we can match each part.
+    user_instructions = []
+    for splitter_part in transcription_lower.split("and"):
+        for period_part in splitter_part.split("."):
+            for comma_part in period_part.split(","):
+                user_instructions.append(comma_part.strip())
 
     responses = []
     for user_instruction in user_instructions:
-        for queries, command in COMMANDS:
+        for queries, command_key in COMMAND_LIST:
             for query in queries:
-                if query in user_instruction:
+                query_lower = query.lower()
+                if query_lower in user_instruction:
+                    # Attempt to find any additional text after the query
                     try:
-                        additional_information = user_instruction.split(query)[1]
+                        additional_information = user_instruction.split(query_lower)[1].strip()
                     except IndexError:
                         additional_information = ""
-                        logger.info("command recorded: "+command)
-                    response = CommandResponse(command=command, additional=additional_information)
+                    logger.info("Command recorded: %s", command_key)
+                    response = CommandResponse(command=command_key, additional=additional_information)
                     responses.append(response)
                     break
-    logger.info("sending commands")
+
+    logger.info("Sending commands: %s", responses)
     return CommandListResponse(commands=responses)
 
 
-@APP.post("/transcribe")
+@APP.post("/transcribe", response_model=FinalResponse)
 async def transcribe(recording: Annotated[UploadFile, File(...)]) -> FinalResponse:
-    """Take recording as input and send back transcription and appropriate commands."""
-    logger.info("transcribe request recieved")
+    """Handle audio transcription requests.
+
+    Args:
+        recording (UploadFile): The audio file upload.
+
+    Returns:
+        FinalResponse: An object containing transcription text and matched commands.
+
+    """
+    logger.info("Transcribe request received.")
+
+    # Read the uploaded audio content
     audio = await recording.read()
     audio_buffer = BytesIO(audio)
+
+    # Convert the audio to single-channel, 16kHz
     audio_segment = AudioSegment.from_file(audio_buffer).set_frame_rate(16000).set_channels(1).set_sample_width(2)
+
+    # Convert samples to float32 in range [-1,1]
     samples = np.array(audio_segment.get_array_of_samples(), dtype=np.float32) / 32768
+
+    # Perform transcription
     result = MODEL.transcribe(
         samples,
         temperature=0,
         condition_on_previous_text=False,
         word_timestamps=True,
     )
-    transcription = result["text"].lower()
+    transcription = result["text"]
+    logger.info("Raw transcription: %s", transcription)
+
+    # Generate commands from transcription
     response = commands(transcription)
-    logger.info("sending final response: " + transcription)
+
+    # Return the final response containing transcription and commands
+    logger.info("Sending final response.")
     return FinalResponse(response=response, message=transcription)
 
 

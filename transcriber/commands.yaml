@@ -1,0 +1,51 @@
+# commands.yaml
+- application_control:
+    open_new_window:
+      - "open browser"
+      - "open new browser"
+      - "start new browser"
+      - "open the browser"
+      - "start browser"
+    close_browser:
+      - "close browser"
+      - "terminate browser"
+    search:
+      - "search"
+      - "search for"
+      - "bing"
+- hardware_control:
+    screenshot:
+      - "take screenshot"
+      - "take a picture"
+      - "screenshot"
+      - "screen shot"
+    capture:
+      - "open camera"
+      - "open the camera"
+- system_info:
+    ram:
+      - "show ram info"
+      - "get ram info"
+      - "show ram usage"
+      - "get ram usage"
+    disk:
+      - "show disk info"
+      - "get disk info"
+      - "show disk usage"
+      - "get disk usage"
+      - "show disc info"
+      - "get disc info"
+      - "show disc usage"
+      - "get disc usage"
+    cpu:
+      - "show cpu usage"
+      - "get cpu usage"
+      - "show cpu info"
+      - "get cpu info"
+    all_hardware_info:
+      - "show system info"
+      - "get system info"
+      - "show hardware info"
+      - "get hardware info"
+      - "show life"
+      - "show life help"

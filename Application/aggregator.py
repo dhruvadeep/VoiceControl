@@ -6,8 +6,8 @@ import yaml
 from fastapi import FastAPI, HTTPException, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
 from loguru import logger
+from pydantic import BaseModel
 
 logger.add("logs.txt", rotation="500 MB")
 logger.info("aggregator starting")
@@ -135,6 +135,34 @@ def ram() -> JSONResponse:
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.post("/all_hardware_info")
+def all_hardware_info() -> JSONResponse:
+    """
+    Call the urls /ram, /disk, /cpu on the hardware service.
+    """
+    try:
+        resp_ram = httpx.get(f"{HARDWARE_URL}/ram")
+        resp_disk = httpx.get(f"{HARDWARE_URL}/disk")
+        resp_cpu = httpx.get(f"{HARDWARE_URL}/cpu")
+        if resp_ram.status_code != 200:
+            raise HTTPException(status_code=resp_ram.status_code, detail=resp_ram.text)
+        if resp_disk.status_code != 200:
+            raise HTTPException(status_code=resp_disk.status_code, detail=resp_disk.text)
+        if resp_cpu.status_code != 200:
+            raise HTTPException(status_code=resp_cpu.status_code, detail=resp_cpu.text)
+        logger.info("all hardware info request sent")
+        return JSONResponse(
+            content={
+                "ram": resp_ram.json(),
+                "disk": resp_disk.json(),
+                "cpu": resp_cpu.json(),
+            }
+        )
+    except Exception as e:
+        logger.info(f"exception {e} encountered")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.post("/new_window_and_search")
 def new_window_and_search(query: SearchQuery) -> dict:
     """
@@ -203,6 +231,7 @@ def close_browser() -> dict:
     except Exception as e:
         logger.info(f"exception {e} encountered")
         raise HTTPException(status_code=500, detail=str(e))
+
 
 logger.info("starting node...")
 if __name__ == "__main__":

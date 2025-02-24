@@ -158,6 +158,21 @@ def ram() -> JSONResponse:
     )
 
 
+# get for no of cores, cpu arc, name
+@app.get("/cpuinfo")
+def cpuinfo() -> JSONResponse:
+    """Returns the number of cores, CPU architecture, and name."""
+    cpu_info = psutil.cpu_info()
+    logger.info("cpu info obtained")
+    return JSONResponse(
+        content={
+            "cores": cpu_info.cores,
+            "arch": cpu_info.arch,
+            "name": cpu_info.name,
+        },
+    )
+
+
 ###############################################################################
 # 6. Run the Application
 ###############################################################################
