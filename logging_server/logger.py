@@ -1,13 +1,17 @@
-from fastapi import FastAPI, Request
-from loguru import logger
-import toml
 import sys
-from pydantic import BaseModel
+
+import toml
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from loguru import logger
+from pydantic import BaseModel
+
 # request model
 
+
 class LogRequest(BaseModel):
-    message:str
+    message: str
+
 
 # Load config
 config = toml.load("config.toml")
@@ -32,6 +36,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
 
 @app.middleware("http")
 async def log_requests(request: Request, call_next):
