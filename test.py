@@ -10,6 +10,7 @@ from pathlib import Path
 import psutil
 import yaml
 
+# Add a mapping from service -> path -> commands -> port -> config_key
 SERVICES = {
     "logger": {
         "path": "logging_server",
@@ -59,6 +60,15 @@ SERVICES = {
     },
 }
 
+# If each service has a log_config.toml, specify where to find them:
+LOG_CONFIG_PATHS = {
+    "logger": "logging_server/log_config.toml",  # If logger itself needs it
+    "browser": "browser_control/log_config.toml",
+    "hardware": "HardwareApplication/log_config.toml",
+    "transcriber": "transcriber/log_config.toml",
+    "aggregator": "Application/log_config.toml",
+}
+
 processes = {}
 executor = ThreadPoolExecutor(max_workers=4)
 local_ip = ""
@@ -82,25 +92,70 @@ def update_config() -> None:
     """
     global local_ip
     config_path = Path("config.yaml")
-    with open(config_path) as f:
-        config = yaml.safe_load(f) or {}
 
+    # Read existing config.yaml or create a new empty dict
+    if config_path.exists():
+        with open(config_path) as f:
+            config = yaml.safe_load(f) or {}
+    else:
+        config = {}
+
+    # Update or create service entries in config
     for service_key, service in SERVICES.items():
         key = service["config_key"]
         if key:  # Only update if there's a config_key defined
-            if key in config:
-                config[key]["host"] = local_ip
-            else:
-                # Create a new entry with a default structure
-                config[key] = {"host": local_ip, "port": service["port"]}
+            if key not in config:
+                config[key] = {}
+            config[key]["host"] = local_ip
+            # Keep existing port if present, else set to default
+            config[key].setdefault("port", service["port"])
+
+    # Write back to config.yaml
     with open(config_path, "w") as f:
         yaml.dump(config, f)
+
+
+def update_log_configs_with_logger_url() -> None:
+    """After config.yaml is updated, read the logger service's host/port
+    and update each service's log_config.toml to point to:
+        url = "http://<logger_host>:<logger_port>"
+    """
+    config_path = Path("config.yaml")
+    if not config_path.exists():
+        return  # Nothing to do if config.yaml doesn't exist
+
+    with open(config_path) as f:
+        config = yaml.safe_load(f) or {}
+
+    # Fetch the logger service host/port from config
+    logger_cfg = config.get("logger_service", {})
+    logger_host = logger_cfg.get("host", "127.0.0.1")
+    logger_port = logger_cfg.get("port", 8080)
+    logger_url = f"http://{logger_host}:{logger_port}"
+
+    # Update each log_config.toml file where it exists
+    for svc, toml_path in LOG_CONFIG_PATHS.items():
+        path_obj = Path(toml_path)
+        if path_obj.exists():
+            new_lines = []
+            with open(path_obj) as fp:
+                lines = fp.readlines()
+            for line in lines:
+                # Replace any line that starts with `url = `
+                # (If your TOML has slightly different formatting, adjust as needed)
+                if line.strip().startswith("url ="):
+                    new_lines.append(f'url = "{logger_url}"\n')
+                else:
+                    new_lines.append(line)
+            # Rewrite the file
+            with open(path_obj, "w") as fp:
+                fp.writelines(new_lines)
 
 
 def run_service(service_name: str) -> None:
     """Run the service by executing each command in the service's 'commands' list.
 
-    If the command includes 'uvicorn', 'hardware.py', 'transcriber.py', or 'aggregator.py',
+    If the command includes 'uvicorn', 'hardware.py', 'transcriber.py', 'aggregator.py', or 'logger.py',
     it will be started via Popen (in the background).
     Otherwise, it will be run via subprocess.run() (blocking).
     """
@@ -150,11 +205,9 @@ def get_service_status() -> dict[str, dict[str, bool | str | int]]:
         running = False
         if pid:
             try:
-                # If we can fetch the psutil.Process(pid), it's running
-                psutil.Process(pid)
+                psutil.Process(pid)  # Raises NoSuchProcess if not running
                 running = True
             except psutil.NoSuchProcess:
-                # If it fails, the process isn't actually running
                 del processes[service_name]
         status[service_name] = {
             "running": running,
@@ -225,17 +278,23 @@ def handle_choice(choice: str) -> None:
 
 
 def start_all_services() -> None:
-    """Start all services *one by one*, in a specific order.
-
-    Including 'logger' now, waiting ~20 seconds between each.
+    """Start all services *one by one*, in a specific order,
+    ensuring logger runs first.
     """
     print("\n🚀 Starting all services in sequence...")
-    service_order = ["browser", "hardware", "transcriber", "aggregator", "logger"]
 
+    # 1) Start logger first
+    print("Starting Logger service first...")
+    run_service("logger")
+    print("Waiting a few seconds for the logger to fully start...")
+    time.sleep(5)
+
+    # 2) Then start the rest in your desired order
+    service_order = ["browser", "hardware", "transcriber", "aggregator"]
     for svc in service_order:
         print(f"Starting {svc.capitalize()} service...")
         run_service(svc)
-        print("Waiting 20 seconds for the service to fully start...")
+        print("Waiting a few seconds for the service to fully start...")
         time.sleep(5)
 
     print("✅ All services have been started. Use option 3 to check status.")
@@ -261,7 +320,12 @@ def main() -> None:
     global local_ip
     local_ip = get_local_ip()
     print(f"🔗 Detected Local IP: {local_ip}")
+
+    # 1) Update config.yaml with local IP
     update_config()
+
+    # 2) Now that config.yaml is updated, read logger_service from it and update all log_config.toml
+    update_log_configs_with_logger_url()
 
     while True:
         show_menu()
