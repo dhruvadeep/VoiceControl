@@ -12,6 +12,7 @@ setup:
     echo "Building the requirements..."
     echo $PWD
     uv sync
+    cd logging_server && uv sync
     cd browser_control && uv sync && uv run playwright install firefox
     cd HardwareApplication && uv sync
     cd Application && uv sync
