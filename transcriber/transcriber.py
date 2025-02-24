@@ -8,9 +8,10 @@ import uvicorn
 import whisper
 from fastapi import FastAPI, File, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
+from loguru import logger
 from pydantic import validate_call
 from pydub.audio_segment import AudioSegment
-from loguru import logger
+
 from models import CommandListResponse, CommandResponse, FinalResponse
 
 APP = FastAPI()

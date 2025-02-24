@@ -6,7 +6,6 @@ import sys
 import time
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
-from typing import Union
 
 import psutil
 import yaml
@@ -85,8 +84,8 @@ def update_config() -> None:
 
 
 def run_service(service_name: str) -> None:
-    """
-    Runs the service by executing each command in the service's 'commands' list.
+    """Run the service by executing each command in the service's 'commands' list.
+
     If the command includes 'uvicorn', 'hardware.py', 'transcriber.py', or 'aggregator.py',
     it will be started via Popen (in the background).
     Otherwise, it will be run via subprocess.run() (blocking).
@@ -103,7 +102,8 @@ def run_service(service_name: str) -> None:
                     process = subprocess.Popen(f"start cmd /k {cmd}", shell=True)
                 elif os.uname().sysname == "Darwin":  # macOS
                     process = subprocess.Popen(
-                        f'osascript -e \'tell application "Terminal" to do script "{cmd}"\'', shell=True
+                        f'osascript -e \'tell application "Terminal" to do script "{cmd}"\'',
+                        shell=True,
                     )
                 else:  # Linux
                     process = subprocess.Popen(f"gnome-terminal -- {cmd}", shell=True)
@@ -123,7 +123,7 @@ def run_service(service_name: str) -> None:
 
 
 def stop_service(service_name: str) -> bool:
-    """Stops the service by killing its subprocess and any children."""
+    """Stop the service by killing its subprocess and any child processes."""
     if service_name in processes:
         try:
             pid = processes[service_name]
@@ -138,7 +138,7 @@ def stop_service(service_name: str) -> bool:
     return False
 
 
-def get_service_status() -> dict[str, dict[str, Union[bool, str, int]]]:
+def get_service_status() -> dict[str, dict[str, bool | str | int]]:
     """Return a dict with running status, host, port, and PID for each service."""
     status = {}
     for service_name, data in SERVICES.items():
@@ -191,8 +191,8 @@ def show_menu() -> None:
 
 
 def handle_choice(choice: str) -> None:
-    """
-    Parse the user's numeric choice and call the appropriate
+    """Parse the user's numeric choice and call the appropriate.
+
     function(s) to start/stop services or print status.
     """
     if choice == "1":
@@ -224,8 +224,8 @@ def handle_choice(choice: str) -> None:
 
 
 def start_all_services() -> None:
-    """
-    Starts all services *one by one*, in a specific order:
+    """Start all services *one by one*, in a specific order.
+
     browser → hardware → transcriber → aggregator
     and waits ~20 seconds between each.
     """
@@ -254,10 +254,9 @@ def start_service(service_name: str) -> None:
     executor.submit(run_service, service_name)
     print(f"✅ {service_name} starting in the background...")
     time.sleep(1)  # Brief pause so we don't spam commands
-    print("Use option 3 to check status.")
 
 
-def main(choice) -> None:
+def main(choice: str) -> None:
     """Take a number as input and perform the corresponding action.
 
     Choices:

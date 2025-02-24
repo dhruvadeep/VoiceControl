@@ -6,7 +6,6 @@ import sys
 import time
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
-from typing import Union
 
 import psutil
 import yaml
@@ -85,8 +84,8 @@ def update_config() -> None:
 
 
 def run_service(service_name: str) -> None:
-    """
-    Runs the service by executing each command in the service's 'commands' list.
+    """Run the service by executing each command in the service's 'commands' list.
+
     If the command includes 'uvicorn', 'hardware.py', 'transcriber.py', or 'aggregator.py',
     it will be started via Popen (in the background).
     Otherwise, it will be run via subprocess.run() (blocking).
@@ -129,7 +128,7 @@ def stop_service(service_name: str) -> bool:
     return False
 
 
-def get_service_status() -> dict[str, dict[str, Union[bool, str, int]]]:
+def get_service_status() -> dict[str, dict[str, bool | str | int]]:
     """Return a dict with running status, host, port, and PID for each service."""
     status = {}
     for service_name, data in SERVICES.items():
@@ -182,8 +181,8 @@ def show_menu() -> None:
 
 
 def handle_choice(choice: str) -> None:
-    """
-    Parse the user's numeric choice and call the appropriate
+    """Parse the user's numeric choice and call the appropriate.
+
     function(s) to start/stop services or print status.
     """
     if choice == "1":
@@ -215,8 +214,8 @@ def handle_choice(choice: str) -> None:
 
 
 def start_all_services() -> None:
-    """
-    Starts all services *one by one*, in a specific order:
+    """Start all services *one by one*, in a specific order.
+
     browser → hardware → transcriber → aggregator
     and waits ~20 seconds between each.
     """

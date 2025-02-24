@@ -1,9 +1,10 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from loguru import logger
 from playwright.async_api import Browser, BrowserContext, Page, Playwright, async_playwright
 
 from models import SearchQuery
-from loguru import logger
+
 logger.add("logs.txt", rotation="500 MB")
 
 class BrowserWindowLimitReachedError(Exception):
