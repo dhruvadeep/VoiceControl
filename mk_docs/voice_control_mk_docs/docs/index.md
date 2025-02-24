@@ -1,4 +1,4 @@
-# Voice Control of Applications
+# Voice Pilot
 Welcome to the documentation for our Voice-Based Control System. 
 
 ## Sections:

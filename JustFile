@@ -6,9 +6,9 @@ default: hello
 
 @hello:
     echo "Hello, Welcome to Voice-Control System"
-    ls
+    
 # A recipe to build the project
-build_all:
+setup:
     echo "Building the requirements..."
     echo $PWD
     uv sync
@@ -19,16 +19,16 @@ build_all:
     echo "Requirements built successfully"
 
 # A recipe to run the project
-run_all:
+run:
     echo "starting the project..."
+    uv sync
     uv run initialisation.py
 
+# A recipe to run the project run component wise
+run_component_wise:
+    echo "starting the project..."
+    uv sync
+    uv run Control.py
 
-# A recipe to test the project
-test:
-    echo "Testing the project..."
 
-# A recipe to clean the project
-clean:
-    echo "Cleaning the project..."
 

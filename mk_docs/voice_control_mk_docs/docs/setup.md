@@ -7,13 +7,13 @@
     - Use the input bar in UI for ip address of other components
 ---
 ## 2. Run the System
-#### To Run the entire system
+#### To Run the entire processes in one system
 1. 
-```just build_all```
+```just setup```
 2. 
-```just run_all```
+```just run```
 
 ## Run only selected components
 ```
-just run_choices
+just run_component_wise
 ```
