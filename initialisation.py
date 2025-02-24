@@ -11,6 +11,15 @@ import psutil
 import yaml
 
 SERVICES = {
+    "logger": {
+        "path": "logging_server",
+        "commands": [
+            "uv sync",
+            "uv run logger.py",
+        ],
+        "port": 8080,
+        "config_key": "logger_service",
+    },
     "browser": {
         "path": "browser_control",
         "commands": [
@@ -68,27 +77,39 @@ def get_local_ip() -> str:
 
 
 def update_config() -> None:
-    """Update config.yaml so that 'host' entries match the current local IP."""
+    """Update config.yaml so that 'host' entries match the current local IP
+    for any known service key in SERVICES that has a config_key defined.
+    """
     global local_ip
     config_path = Path("config.yaml")
-    with open(config_path) as f:
-        config = yaml.safe_load(f)
 
-    # Update services that exist in config.yaml
-    for service_key in ["hardware_service", "browser_service", "aggregator_service"]:
-        if service_key in config:
-            config[service_key]["host"] = local_ip
+    if not config_path.exists():
+        print("No config.yaml found. Skipping config update.")
+        return
+
+    with open(config_path) as f:
+        config = yaml.safe_load(f) or {}
+
+    # Update the relevant service hosts with our local IP.
+    for service_name, svc_data in SERVICES.items():
+        cfg_key = svc_data.get("config_key")
+        if cfg_key:
+            # If the config key doesn't exist at all, we might initialize it.
+            if cfg_key not in config:
+                config[cfg_key] = {"port": svc_data["port"]}
+            config[cfg_key]["host"] = local_ip
 
     with open(config_path, "w") as f:
         yaml.dump(config, f)
 
 
 def run_service(service_name: str) -> None:
-    """Run the service by executing each command in the service's 'commands' list.
+    """Run the service by executing each command in the service's 'commands' list
+    inside a new terminal window (foreground) if it matches the usual 'long-running'
+    commands (logger.py, uvicorn, hardware.py, etc.). Otherwise, run synchronously.
 
-    If the command includes 'uvicorn', 'hardware.py', 'transcriber.py', or 'aggregator.py',
-    it will be started via Popen (in the background).
-    Otherwise, it will be run via subprocess.run() (blocking).
+    Adjust the new-terminal logic for Windows (start cmd), macOS (osascript),
+    or Linux (gnome-terminal) as needed.
     """
     service = SERVICES[service_name]
     original_dir = os.getcwd()
@@ -96,34 +117,30 @@ def run_service(service_name: str) -> None:
     try:
         os.chdir(service["path"])
         for cmd in service["commands"]:
-            # Check if this command should be run in the background
-            if any(x in cmd for x in ["uvicorn", "hardware.py", "transcriber.py", "aggregator.py"]):
+            # List of known "long-running" commands we want in a new terminal:
+            if any(x in cmd for x in ["logger.py", "uvicorn", "hardware.py", "transcriber.py", "aggregator.py"]):
                 if os.name == "nt":  # Windows
                     process = subprocess.Popen(f"start cmd /k {cmd}", shell=True)
-                elif os.uname().sysname == "Darwin":  # macOS
+                elif sys.platform == "darwin":  # macOS
+                    # Using osascript to open Terminal and run the command
                     process = subprocess.Popen(
                         f'osascript -e \'tell application "Terminal" to do script "{cmd}"\'',
                         shell=True,
                     )
-                else:  # Linux
+                else:  # Linux (gnome-terminal). Adjust if using a different terminal
                     process = subprocess.Popen(f"gnome-terminal -- {cmd}", shell=True)
-                processes[service_name] = process.pid
-                # process = subprocess.Popen(
-                #     cmd,
-                #     shell=True,
-                #     stdout=subprocess.DEVNULL,
-                #     stderr=subprocess.DEVNULL,
-                # )
 
+                processes[service_name] = process.pid
             else:
-                # Blocking command, e.g. 'uv sync'
+                # For short/one-shot commands (e.g., 'uv sync'):
                 subprocess.run(cmd, shell=True, check=True)
+
     finally:
         os.chdir(original_dir)
 
 
 def stop_service(service_name: str) -> bool:
-    """Stop the service by killing its subprocess and any child processes."""
+    """Stop the service by killing its subprocess and any children."""
     if service_name in processes:
         try:
             pid = processes[service_name]
@@ -133,8 +150,10 @@ def stop_service(service_name: str) -> bool:
             parent.kill()
             del processes[service_name]
             return True
-        except Exception:
-            return False
+        except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
+            pass
+        except Exception as e:
+            print(f"Error stopping {service_name}: {e}")
     return False
 
 
@@ -146,11 +165,9 @@ def get_service_status() -> dict[str, dict[str, bool | str | int]]:
         running = False
         if pid:
             try:
-                # If we can fetch the psutil.Process(pid), it's running
-                psutil.Process(pid)
+                psutil.Process(pid)  # Raises NoSuchProcess if not running
                 running = True
             except psutil.NoSuchProcess:
-                # If it fails, the process isn't actually running
                 del processes[service_name]
         status[service_name] = {
             "running": running,
@@ -166,11 +183,12 @@ def print_status() -> None:
     status = get_service_status()
     print("\n📡 Service Status:")
     print(f"{'Service':<12} | {'Status':<8} | {'Endpoint':<25} | PID")
-    print("-" * 50)
+    print("-" * 60)
     for name, info in status.items():
         state = "🟢 RUNNING" if info["running"] else "🔴 STOPPED"
         endpoint = f"http://{info['host']}:{info['port']}"
-        print(f"{name:<12} | {state:<8} | {endpoint:<25} | {info['pid'] or 'N/A'}")
+        pid_str = str(info["pid"]) if info["pid"] else "N/A"
+        print(f"{name:<12} | {state:<8} | {endpoint:<25} | {pid_str}")
 
 
 def show_menu() -> None:
@@ -180,21 +198,18 @@ def show_menu() -> None:
     print("2. Stop All Services")
     print("3. List Running Services")
     # Start service options
-    for i, service in enumerate(SERVICES.keys(), 4):
+    for i, service in enumerate(SERVICES.keys(), start=4):
         print(f"{i}. Start {service.capitalize()} Service")
     stop_start = 4 + len(SERVICES)
     # Stop service options
-    for i, service in enumerate(SERVICES.keys(), stop_start):
+    for i, service in enumerate(SERVICES.keys(), start=stop_start):
         print(f"{i}. Stop {service.capitalize()} Service")
     # Exit option
     print(f"{stop_start + len(SERVICES)}. Exit")
 
 
 def handle_choice(choice: str) -> None:
-    """Parse the user's numeric choice and call the appropriate.
-
-    function(s) to start/stop services or print status.
-    """
+    """Parse the user's numeric choice and call the appropriate function(s)."""
     if choice == "1":
         start_all_services()
     elif choice == "2":
@@ -212,7 +227,9 @@ def handle_choice(choice: str) -> None:
         elif 4 + len(SERVICES) <= choice_int <= 3 + len(SERVICES) * 2:
             service_index = choice_int - (4 + len(SERVICES))
             service_name = list(SERVICES.keys())[service_index]
-            stop_service(service_name)
+            stopped = stop_service(service_name)
+            if not stopped:
+                print(f"Service {service_name} was not running or could not be stopped.")
         # Exiting
         elif choice_int == (4 + len(SERVICES) * 2):
             print("👋 Exiting...")
@@ -224,19 +241,25 @@ def handle_choice(choice: str) -> None:
 
 
 def start_all_services() -> None:
-    """Start all services *one by one*, in a specific order.
+    """Start all services *one by one* in a specific order:
+    1) logger (first)
+    2) browser
+    3) hardware
+    4) transcriber
+    5) aggregator
 
-    browser → hardware → transcriber → aggregator
-    and waits ~20 seconds between each.
+    and wait ~10 seconds between each to let them spin up.
     """
     print("\n🚀 Starting all services in sequence...")
-    service_order = ["browser", "hardware", "transcriber", "aggregator"]
+
+    # Define the order you want:
+    service_order = ["logger", "browser", "hardware", "transcriber", "aggregator"]
 
     for svc in service_order:
         print(f"Starting {svc.capitalize()} service...")
         run_service(svc)
-        print("Waiting 20 seconds for the service to fully start...")
-        time.sleep(20)
+        print("Waiting 10 seconds to let the service fully start...\n")
+        time.sleep(10)
 
     print("✅ All services have been started. Use option 3 to check status.")
 
@@ -250,24 +273,25 @@ def stop_all_services() -> None:
 
 
 def start_service(service_name: str) -> None:
-    """Start a single service (placed in the background if it matches our condition)."""
+    """Start a single service in the background (new terminal)."""
+    print(f"Starting {service_name} service...")
     executor.submit(run_service, service_name)
-    print(f"✅ {service_name} starting in the background...")
     time.sleep(1)  # Brief pause so we don't spam commands
+    print("Use option 3 to check status.")
 
 
 def main(choice: str) -> None:
-    """Take a number as input and perform the corresponding action.
+    """Main entry that performs the action corresponding to the numeric choice.
 
-    Choices:
-    1. Validate (Start) All Services Sequentially
-    2. Stop All Services
-    3. List Running Services
+    Examples:
+      - main("1") => start all services sequentially
+      - main("2") => stop all services
+      - main("3") => print status
+
     """
     global local_ip
     local_ip = get_local_ip()
-    # this line can be used,if needed print(f"🔗 Detected Local IP: {local_ip}")
-    update_config()
+    update_config()  # Update the config.yaml with our local IP
     try:
         handle_choice(choice)
     except KeyboardInterrupt:
@@ -275,9 +299,15 @@ def main(choice: str) -> None:
 
 
 if __name__ == "__main__":
+    """
+    By default, this will:
+      1) Update config.yaml with your local IP
+      2) Start ALL services sequentially (logger first, then others)
+      3) Keep the script alive until you Ctrl+C, upon which all services are stopped.
+    """
     try:
-        main("1")
+        main("1")  # Automatically "Validate (Start) All Services Sequentially"
         while True:
-            pass
+            pass  # Keep this script running. Press Ctrl+C to stop.
     except KeyboardInterrupt:
         stop_all_services()
