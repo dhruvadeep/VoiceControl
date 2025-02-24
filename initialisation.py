@@ -59,6 +59,15 @@ SERVICES = {
     },
 }
 
+# If each service has a log_config.toml, specify where to find them:
+LOG_CONFIG_PATHS = {
+    "logger": "logging_server/log_config.toml",  # If logger itself needs it
+    "browser": "browser_control/log_config.toml",
+    "hardware": "HardwareApplication/log_config.toml",
+    "transcriber": "transcriber/log_config.toml",
+    "aggregator": "Application/log_config.toml",
+}
+
 processes = {}
 executor = ThreadPoolExecutor(max_workers=4)
 local_ip = ""
@@ -102,6 +111,41 @@ def update_config() -> None:
     with open(config_path, "w") as f:
         yaml.dump(config, f)
 
+def update_log_configs_with_logger_url() -> None:
+    """After config.yaml is updated, read the logger service's host/port
+    and update each service's log_config.toml to point to:
+        url = "http://<logger_host>:<logger_port>"
+    """
+    config_path = Path("config.yaml")
+    if not config_path.exists():
+        return  # Nothing to do if config.yaml doesn't exist
+
+    with open(config_path) as f:
+        config = yaml.safe_load(f) or {}
+
+    # Fetch the logger service host/port from config
+    logger_cfg = config.get("logger_service", {})
+    logger_host = logger_cfg.get("host", "127.0.0.1")
+    logger_port = logger_cfg.get("port", 8080)
+    logger_url = f"http://{logger_host}:{logger_port}"
+
+    # Update each log_config.toml file where it exists
+    for svc, toml_path in LOG_CONFIG_PATHS.items():
+        path_obj = Path(toml_path)
+        if path_obj.exists():
+            new_lines = []
+            with open(path_obj) as fp:
+                lines = fp.readlines()
+            for line in lines:
+                # Replace any line that starts with `url = `
+                # (If your TOML has slightly different formatting, adjust as needed)
+                if line.strip().startswith("url ="):
+                    new_lines.append(f'url = "{logger_url}"\n')
+                else:
+                    new_lines.append(line)
+            # Rewrite the file
+            with open(path_obj, "w") as fp:
+                fp.writelines(new_lines)
 
 def run_service(service_name: str) -> None:
     """Run the service by executing each command in the service's 'commands' list
@@ -292,8 +336,11 @@ def main(choice: str) -> None:
     global local_ip
     local_ip = get_local_ip()
     update_config()  # Update the config.yaml with our local IP
+    update_log_configs_with_logger_url() # update log files
     try:
         handle_choice(choice)
+        while True:
+            pass
     except KeyboardInterrupt:
         print("\n👋 Exiting...")
 
@@ -307,7 +354,5 @@ if __name__ == "__main__":
     """
     try:
         main("1")  # Automatically "Validate (Start) All Services Sequentially"
-        while True:
-            pass  # Keep this script running. Press Ctrl+C to stop.
     except KeyboardInterrupt:
         stop_all_services()
