@@ -1,0 +1,6 @@
+[log]
+level = "INFO"
+rotation = "1 day"  # Rotate logs daily
+retention = "7 days"  # Keep logs for 7 days
+compression = "zip"  # Compress old logs
+filename = "logs/server.log"
