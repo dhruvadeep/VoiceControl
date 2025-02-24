@@ -48,6 +48,15 @@ SERVICES = {
         "port": 8000,
         "config_key": "aggregator_service",
     },
+    "logger": {
+        "path": "logging_server",
+        "commands": [
+            "uv sync",
+            "uv run logger.py",
+        ],
+        "port": 8080,
+        "config_key": "logger_service",
+    },
 }
 
 processes = {}
@@ -68,17 +77,22 @@ def get_local_ip() -> str:
 
 
 def update_config() -> None:
-    """Update config.yaml so that 'host' entries match the current local IP."""
+    """Update config.yaml so that 'host' entries match the current local IP.
+    If a service is missing, add it with its default port.
+    """
     global local_ip
     config_path = Path("config.yaml")
     with open(config_path) as f:
-        config = yaml.safe_load(f)
+        config = yaml.safe_load(f) or {}
 
-    # Update services that exist in config.yaml
-    for service_key in ["hardware_service", "browser_service", "aggregator_service"]:
-        if service_key in config:
-            config[service_key]["host"] = local_ip
-
+    for service_key, service in SERVICES.items():
+        key = service["config_key"]
+        if key:  # Only update if there's a config_key defined
+            if key in config:
+                config[key]["host"] = local_ip
+            else:
+                # Create a new entry with a default structure
+                config[key] = {"host": local_ip, "port": service["port"]}
     with open(config_path, "w") as f:
         yaml.dump(config, f)
 
@@ -97,7 +111,7 @@ def run_service(service_name: str) -> None:
         os.chdir(service["path"])
         for cmd in service["commands"]:
             # Check if this command should be run in the background
-            if any(x in cmd for x in ["uvicorn", "hardware.py", "transcriber.py", "aggregator.py"]):
+            if any(x in cmd for x in ["uvicorn", "hardware.py", "transcriber.py", "aggregator.py", "logger.py"]):
                 process = subprocess.Popen(
                     cmd,
                     shell=True,
@@ -181,10 +195,7 @@ def show_menu() -> None:
 
 
 def handle_choice(choice: str) -> None:
-    """Parse the user's numeric choice and call the appropriate.
-
-    function(s) to start/stop services or print status.
-    """
+    """Parse the user's numeric choice and call the appropriate function(s)."""
     if choice == "1":
         start_all_services()
     elif choice == "2":
@@ -216,17 +227,16 @@ def handle_choice(choice: str) -> None:
 def start_all_services() -> None:
     """Start all services *one by one*, in a specific order.
 
-    browser → hardware → transcriber → aggregator
-    and waits ~20 seconds between each.
+    Including 'logger' now, waiting ~20 seconds between each.
     """
     print("\n🚀 Starting all services in sequence...")
-    service_order = ["browser", "hardware", "transcriber", "aggregator"]
+    service_order = ["browser", "hardware", "transcriber", "aggregator", "logger"]
 
     for svc in service_order:
         print(f"Starting {svc.capitalize()} service...")
         run_service(svc)
         print("Waiting 20 seconds for the service to fully start...")
-        time.sleep(20)
+        time.sleep(5)
 
     print("✅ All services have been started. Use option 3 to check status.")
 
