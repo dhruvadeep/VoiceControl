@@ -177,7 +177,9 @@ gradio_ui/
 # ruff cache
 .ruff_cache
 
-# logs
+# log texts
 logs.txt
+# log folder
+logs/
 
 # png files inside images folder in hardware

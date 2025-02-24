@@ -7,12 +7,14 @@ import numpy as np
 import uvicorn
 import whisper
 import yaml
+import httpx
+import toml
 from fastapi import FastAPI, File, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from loguru import logger
-from models import CommandListResponse, CommandResponse, FinalResponse
 from pydantic import validate_call
 from pydub.audio_segment import AudioSegment
+
+from models import CommandListResponse, CommandResponse, FinalResponse
 
 APP = FastAPI()
 APP.add_middleware(
@@ -23,9 +25,13 @@ APP.add_middleware(
     allow_headers=["*"],
 )
 
-
 class CannotLoadModelError(Exception):
     """CannotLoadModelError occurs when you are facing issues while loading a model."""
+
+def logger_info(message:str):
+    "Log message in a server."
+    url = toml.load("log_config.toml")["url"]+"/log"
+    httpx.request(method="POST", url=url, json={"message":message})
 
 
 DEVICE = "cpu"
@@ -46,7 +52,7 @@ try:
     with open(COMMANDS_YAML_PATH, encoding="utf-8") as file:
         YAML_COMMANDS = yaml.safe_load(file)
 except FileNotFoundError:
-    logger.error(f"Could not find {COMMANDS_YAML_PATH} file.")
+    logger_info(f"Could not find {COMMANDS_YAML_PATH} file.")
     YAML_COMMANDS = []
 
 # Flatten the YAML command structure into a list of (List[str], str) tuples.
@@ -88,12 +94,12 @@ def commands(transcription: str) -> CommandListResponse:
                         additional_information = user_instruction.split(query_lower)[1].strip()
                     except IndexError:
                         additional_information = ""
-                    logger.info("Command recorded: %s", command_key)
+                    logger_info("Command recorded: "+ command_key)
                     response = CommandResponse(command=command_key, additional=additional_information)
                     responses.append(response)
                     break
 
-    logger.info("Sending commands: %s", responses)
+    logger_info("Sending commands")
     return CommandListResponse(commands=responses)
 
 
@@ -108,7 +114,7 @@ async def transcribe(recording: Annotated[UploadFile, File(...)]) -> FinalRespon
         FinalResponse: An object containing transcription text and matched commands.
 
     """
-    logger.info("Transcribe request received.")
+    logger_info("Transcribe request received.")
 
     # Read the uploaded audio content
     audio = await recording.read()
@@ -128,13 +134,13 @@ async def transcribe(recording: Annotated[UploadFile, File(...)]) -> FinalRespon
         word_timestamps=True,
     )
     transcription = result["text"]
-    logger.info("Raw transcription: %s", transcription)
+    logger_info("Raw transcription: " + transcription)
 
     # Generate commands from transcription
     response = commands(transcription)
 
     # Return the final response containing transcription and commands
-    logger.info("Sending final response.")
+    logger_info("Sending final response.")
     return FinalResponse(response=response, message=transcription)
 
 
