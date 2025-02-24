@@ -29,12 +29,15 @@ default: hello
 @run_component_wise:
     echo "starting the project..."
     uv sync
-    uv run Control.py
+    uv run control.py
 
 @mkdocs:
     echo "serving..."
     cd mk_docs/voice_control_mk_docs && uv sync && uv run mkdocs serve -a 127.0.0.1:8888
     echo "Documentation serving successfully"
 
-
+@ui:
+    echo "starting the UI..."
+    cd UI && uv run python -m http.server 8088
+    echo "UI started successfully at http://localhost:8088"
 
