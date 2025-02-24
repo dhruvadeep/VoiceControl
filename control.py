@@ -282,7 +282,7 @@ def start_all_services() -> None:
     ensuring logger runs first.
     """
     print("\n🚀 Starting all services in sequence...")
-
+    update_log_configs_with_logger_url()
     # 1) Start logger first
     print("Starting Logger service first...")
     run_service("logger")
@@ -323,9 +323,6 @@ def main() -> None:
 
     # 1) Update config.yaml with local IP
     update_config()
-
-    # 2) Now that config.yaml is updated, read logger_service from it and update all log_config.toml
-    update_log_configs_with_logger_url()
 
     while True:
         show_menu()
