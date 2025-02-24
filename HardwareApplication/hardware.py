@@ -1,31 +1,31 @@
 import asyncio
 import shutil
 import uuid
+from collections.abc import Awaitable, Callable
 from threading import Lock
-from typing import Awaitable, Callable, Optional, Tuple
 
 import cv2
 import psutil
 import pyautogui
 from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.responses import FileResponse, JSONResponse
-from starlette.responses import Response as StarletteResponse
 from loguru import logger
+from starlette.responses import Response as StarletteResponse
 
 app = FastAPI()
 
 logger.add("logs.txt", rotation="500 MB")
 
-camera: Optional[cv2.VideoCapture] = None
+camera: cv2.VideoCapture | None = None
 camera_lock: Lock = Lock()
 
 
 @app.middleware("http")
 async def add_cors_header(
-    request: Request, call_next: Callable[[Request], Awaitable[StarletteResponse]]
+    request: Request,
+    call_next: Callable[[Request], Awaitable[StarletteResponse]],
 ) -> StarletteResponse:
-    """
-    Middleware to add CORS header to each response.
+    """Middleware to add CORS header to each response.
     Allows all origins (*). For production, specify allowed domains.
     """
     response: StarletteResponse = await call_next(request)
@@ -36,8 +36,7 @@ async def add_cors_header(
 
 @app.on_event("startup")
 async def startup_event() -> None:
-    """
-    On startup, open the camera and perform a warmup.
+    """On startup, open the camera and perform a warmup.
     If the camera cannot be opened or warmed up, raise an exception.
     """
     global camera
@@ -60,9 +59,7 @@ async def startup_event() -> None:
 
 @app.on_event("shutdown")
 def shutdown_event() -> None:
-    """
-    On shutdown, release the camera resource if it exists.
-    """
+    """On shutdown, release the camera resource if it exists."""
     global camera
     logger.info("shutting down camera")
     if camera is not None:
@@ -71,9 +68,7 @@ def shutdown_event() -> None:
 
 @app.get("/capture")
 async def capture() -> Response:
-    """
-    Capture an image using the warmed-up camera and return it as a PNG image.
-    """
+    """Capture an image using the warmed-up camera and return it as a PNG image."""
     global camera
     logger.info("capture request received")
     if camera is None or not camera.isOpened():
@@ -102,9 +97,7 @@ async def capture() -> Response:
 
 @app.get("/screenshot")
 def screenshot() -> FileResponse:
-    """
-    Take a screenshot of the current screen and return it as a PNG image file.
-    """
+    """Take a screenshot of the current screen and return it as a PNG image file."""
     filename = f"./images/screenshot_{uuid.uuid4().hex}.png"
     image = pyautogui.screenshot()
     image.save(filename)
@@ -114,27 +107,21 @@ def screenshot() -> FileResponse:
 
 @app.get("/cpu")
 def cpu() -> JSONResponse:
-    """
-    Returns the current CPU usage percentage.
-    """
+    """Returns the current CPU usage percentage."""
     cpu_percent = psutil.cpu_percent(interval=0.5)
     logger.info("cpu info obtained")
     return JSONResponse(content={"cpu_percent": cpu_percent})
 
 
-def get_disk_usage() -> Tuple[int, int, int]:
-    """
-    Returns disk usage (total, used, free) in bytes for the root path.
-    """
+def get_disk_usage() -> tuple[int, int, int]:
+    """Returns disk usage (total, used, free) in bytes for the root path."""
     total, used, free = shutil.disk_usage("/")
     logger.info("disk info obtained")
     return total, used, free
 
 
 def format_size(byte_size: float) -> str:
-    """
-    Formats a byte value into a human-readable string (e.g., B, KB, MB, GB, TB).
-    """
+    """Formats a byte value into a human-readable string (e.g., B, KB, MB, GB, TB)."""
     for unit in ["B", "KB", "MB", "GB", "TB"]:
         if byte_size < 1024:
             return f"{byte_size:.2f}{unit}"
@@ -144,24 +131,20 @@ def format_size(byte_size: float) -> str:
 
 @app.get("/disk")
 def disk() -> JSONResponse:
-    """
-    Returns disk usage information (total, used, free) in a formatted string.
-    """
+    """Returns disk usage information (total, used, free) in a formatted string."""
     total, used, free = get_disk_usage()
     return JSONResponse(
         content={
             "total": format_size(total),
             "used": format_size(used),
             "free": format_size(free),
-        }
+        },
     )
 
 
 @app.get("/ram")
 def ram() -> JSONResponse:
-    """
-    Returns total, used, and available RAM in a formatted string.
-    """
+    """Returns total, used, and available RAM in a formatted string."""
     total = psutil.virtual_memory().total
     available = psutil.virtual_memory().available
     used = total - available
@@ -171,7 +154,7 @@ def ram() -> JSONResponse:
             "total": format_size(total),
             "used": format_size(used),
             "available": format_size(available),
-        }
+        },
     )
 
 
