@@ -6,11 +6,12 @@ readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "fastapi[standard]>=0.115.8",
-    "loguru>=0.7.3",
+    "httpx>=0.28.1",
     "opencv-python>=4.11.0.86",
     "pillow>=11.1.0",
     "psutil>=7.0.0",
     "pyautogui>=0.9.54",
     "pyscreeze>=1.0.1",
     "ruff>=0.9.7",
+    "toml>=0.10.2",
 ]

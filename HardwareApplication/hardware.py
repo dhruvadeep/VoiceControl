@@ -9,16 +9,20 @@ import psutil
 import pyautogui
 from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.responses import FileResponse, JSONResponse
-from loguru import logger
 from starlette.responses import Response as StarletteResponse
+import httpx
+import toml
+
 
 app = FastAPI()
-
-logger.add("logs.txt", rotation="500 MB")
 
 camera: cv2.VideoCapture | None = None
 camera_lock: Lock = Lock()
 
+def logger_info(message:str):
+    "Log message in a server."
+    url = toml.load("log_config.toml")["url"]+"/log"
+    httpx.request(method="POST", url=url, json={"message":message})
 
 @app.middleware("http")
 async def add_cors_header(
@@ -30,7 +34,7 @@ async def add_cors_header(
     """
     response: StarletteResponse = await call_next(request)
     response.headers["Access-Control-Allow-Origin"] = "*"
-    logger.info("adding cors headers")
+    logger_info("adding cors headers")
     return response
 
 
@@ -42,18 +46,18 @@ async def startup_event() -> None:
     global camera
     camera = cv2.VideoCapture(0)
     if not camera.isOpened():
-        logger.info("Could not open camera at startup.")
+        logger_info("Could not open camera at startup.")
         raise Exception("Error: Could not open camera at startup.")
-    logger.info("Camera initialized")
+    logger_info("Camera initialized")
     # Warm up the camera by reading and discarding a few frames
     for _ in range(10):
         ret, _ = camera.read()
         if not ret:
-            logger.info("Could not warmup camera")
+            logger_info("Could not warmup camera")
             raise Exception("Error: Could not warm up camera.")
         # Slight delay to allow the camera to adjust (if needed)
         await asyncio.sleep(0.1)
-    logger.info("Camera warmed up")
+    logger_info("Camera warmed up")
     print("Camera initialized and warmed up.")
 
 
@@ -61,7 +65,7 @@ async def startup_event() -> None:
 def shutdown_event() -> None:
     """On shutdown, release the camera resource if it exists."""
     global camera
-    logger.info("shutting down camera")
+    logger_info("shutting down camera")
     if camera is not None:
         camera.release()
 
@@ -70,9 +74,9 @@ def shutdown_event() -> None:
 async def capture() -> Response:
     """Capture an image using the warmed-up camera and return it as a PNG image."""
     global camera
-    logger.info("capture request received")
+    logger_info("capture request received")
     if camera is None or not camera.isOpened():
-        logger.info("camera not available")
+        logger_info("camera not available")
         raise HTTPException(status_code=500, detail="Camera not available.")
 
     # Lock the camera access to avoid race conditions
@@ -82,15 +86,15 @@ async def capture() -> Response:
         ret, frame = camera.read()
 
     if not ret:
-        logger.info("failed to capture image")
+        logger_info("failed to capture image")
         raise HTTPException(status_code=500, detail="Failed to capture image.")
 
     # Encode the captured frame as a PNG image in memory
     success, encoded_image = cv2.imencode(".png", frame)
     if not success:
-        logger.info("could not encode image")
+        logger_info("could not encode image")
         raise HTTPException(status_code=500, detail="Could not encode image.")
-    logger.info("image captured")
+    logger_info("image captured")
     # Return the image as an in-memory response
     return Response(content=encoded_image.tobytes(), media_type="image/png")
 
@@ -101,7 +105,7 @@ def screenshot() -> FileResponse:
     filename = f"./images/screenshot_{uuid.uuid4().hex}.png"
     image = pyautogui.screenshot()
     image.save(filename)
-    logger.info("screenshot taken")
+    logger_info("screenshot taken")
     return FileResponse(path=filename, media_type="image/png", filename="screenshot.png")
 
 
@@ -109,14 +113,14 @@ def screenshot() -> FileResponse:
 def cpu() -> JSONResponse:
     """Returns the current CPU usage percentage."""
     cpu_percent = psutil.cpu_percent(interval=0.5)
-    logger.info("cpu info obtained")
+    logger_info("cpu info obtained")
     return JSONResponse(content={"cpu_percent": cpu_percent})
 
 
 def get_disk_usage() -> tuple[int, int, int]:
     """Returns disk usage (total, used, free) in bytes for the root path."""
     total, used, free = shutil.disk_usage("/")
-    logger.info("disk info obtained")
+    logger_info("disk info obtained")
     return total, used, free
 
 
@@ -148,7 +152,7 @@ def ram() -> JSONResponse:
     total = psutil.virtual_memory().total
     available = psutil.virtual_memory().available
     used = total - available
-    logger.info("ram info obtained")
+    logger_info("ram info obtained")
     return JSONResponse(
         content={
             "total": format_size(total),
@@ -163,7 +167,7 @@ def ram() -> JSONResponse:
 def cpuinfo() -> JSONResponse:
     """Returns the number of cores, CPU architecture, and name."""
     cpu_info = psutil.cpu_info()
-    logger.info("cpu info obtained")
+    logger_info("cpu info obtained")
     return JSONResponse(
         content={
             "cores": cpu_info.cores,

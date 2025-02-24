@@ -6,11 +6,15 @@ import yaml
 from fastapi import FastAPI, HTTPException, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from loguru import logger
 from pydantic import BaseModel
+import toml
 
-logger.add("logs.txt", rotation="500 MB")
-logger.info("aggregator starting")
+def logger_info(message:str):
+    "Log message in a server."
+    url = toml.load("log_config.toml")["url"]+"/log"
+    httpx.request(method="POST", url=url, json={"message":message})
+    
+logger_info("aggregator starting")
 
 CONFIG_FILE_PATH = os.getenv("CONFIG_FILE_PATH", "../config.yaml")
 
@@ -57,13 +61,13 @@ def capture() -> Response:
         resp = httpx.get(f"{HARDWARE_URL}/capture")
         if resp.status_code != 200:
             raise HTTPException(status_code=resp.status_code, detail=resp.text)
-        logger.info("capture request sent")
+        logger_info("capture request sent")
         return Response(
             content=resp.content,
             media_type=resp.headers.get("content-type", "image/png"),
         )
     except Exception as e:
-        logger.info(f"exception {e} encountered")
+        logger_info(f"exception {e} encountered")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -77,13 +81,13 @@ def screenshot() -> Response:
         resp = httpx.get(f"{HARDWARE_URL}/screenshot")
         if resp.status_code != 200:
             raise HTTPException(status_code=resp.status_code, detail=resp.text)
-        logger.info("screenshot request sent")
+        logger_info("screenshot request sent")
         return Response(
             content=resp.content,
             media_type=resp.headers.get("content-type", "image/png"),
         )
     except Exception as e:
-        logger.info(f"exception {e} encountered")
+        logger_info(f"exception {e} encountered")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -96,10 +100,10 @@ def cpu() -> JSONResponse:
         resp = httpx.get(f"{HARDWARE_URL}/cpu")
         if resp.status_code != 200:
             raise HTTPException(status_code=resp.status_code, detail=resp.text)
-        logger.info("cpu info request sent")
+        logger_info("cpu info request sent")
         return JSONResponse(content=resp.json())
     except Exception as e:
-        logger.info(f"exception {e} encountered")
+        logger_info(f"exception {e} encountered")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -112,10 +116,10 @@ def disk() -> JSONResponse:
         resp = httpx.get(f"{HARDWARE_URL}/disk")
         if resp.status_code != 200:
             raise HTTPException(status_code=resp.status_code, detail=resp.text)
-        logger.info("disk info request sent")
+        logger_info("disk info request sent")
         return JSONResponse(content=resp.json())
     except Exception as e:
-        logger.info(f"exception {e} encountered")
+        logger_info(f"exception {e} encountered")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -128,10 +132,10 @@ def ram() -> JSONResponse:
         resp = httpx.get(f"{HARDWARE_URL}/ram")
         if resp.status_code != 200:
             raise HTTPException(status_code=resp.status_code, detail=resp.text)
-        logger.info("ram info request sent")
+        logger_info("ram info request sent")
         return JSONResponse(content=resp.json())
     except Exception as e:
-        logger.info(f"exception {e} encountered")
+        logger_info(f"exception {e} encountered")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -150,7 +154,7 @@ def all_hardware_info() -> JSONResponse:
             raise HTTPException(status_code=resp_disk.status_code, detail=resp_disk.text)
         if resp_cpu.status_code != 200:
             raise HTTPException(status_code=resp_cpu.status_code, detail=resp_cpu.text)
-        logger.info("all hardware info request sent")
+        logger_info("all hardware info request sent")
         return JSONResponse(
             content={
                 "ram": resp_ram.json(),
@@ -159,7 +163,7 @@ def all_hardware_info() -> JSONResponse:
             }
         )
     except Exception as e:
-        logger.info(f"exception {e} encountered")
+        logger_info(f"exception {e} encountered")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -170,10 +174,10 @@ def new_window_and_search(query: SearchQuery) -> dict:
     """
     try:
         resp = httpx.post(f"{BROWSER_URL}/browser/new_window_and_search", json=query.dict())
-        logger.info("new window and search request sent")
+        logger_info("new window and search request sent")
         return resp.json()  # returns a dict
     except Exception as e:
-        logger.info(f"exception {e} encountered")
+        logger_info(f"exception {e} encountered")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -184,10 +188,10 @@ def open_new_window() -> dict:
     """
     try:
         resp = httpx.post(f"{BROWSER_URL}/browser/open_new_window")
-        logger.info("open window request sent")
+        logger_info("open window request sent")
         return resp.json()  # returns a dict
     except Exception as e:
-        logger.info(f"exception {e} encountered")
+        logger_info(f"exception {e} encountered")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -198,10 +202,10 @@ def search(query: SearchQuery) -> dict:
     """
     try:
         resp = httpx.post(f"{BROWSER_URL}/browser/search", json=query.dict())
-        logger.info("search request sent")
+        logger_info("search request sent")
         return resp.json()  # returns a dict
     except Exception as e:
-        logger.info(f"exception {e} encountered")
+        logger_info(f"exception {e} encountered")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -212,10 +216,10 @@ def close_current_window() -> dict:
     """
     try:
         resp = httpx.post(f"{BROWSER_URL}/browser/close_current_window")
-        logger.info("close window request sent")
+        logger_info("close window request sent")
         return resp.json()  # returns a dict
     except Exception as e:
-        logger.info(f"exception {e} encountered")
+        logger_info(f"exception {e} encountered")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -226,14 +230,14 @@ def close_browser() -> dict:
     """
     try:
         resp = httpx.post(f"{BROWSER_URL}/browser/close_browser")
-        logger.info("close browser request sent")
+        logger_info("close browser request sent")
         return resp.json()  # returns a dict
     except Exception as e:
-        logger.info(f"exception {e} encountered")
+        logger_info(f"exception {e} encountered")
         raise HTTPException(status_code=500, detail=str(e))
 
 
-logger.info("starting node...")
+logger_info("starting node...")
 if __name__ == "__main__":
     uvicorn.run(
         "aggregator:app",
